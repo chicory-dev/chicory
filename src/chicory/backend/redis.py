@@ -2,7 +2,8 @@ from typing import Any
 
 from redis import asyncio as redis
 
-from chicory.types import TaskResult, TaskState, WorkerStats
+from chicory.config import RedisBackendConfig  # noqa: TC001
+from chicory.types import BackendStatus, TaskResult, TaskState, WorkerStats
 
 from .base import Backend
 
@@ -10,9 +11,9 @@ from .base import Backend
 class RedisBackend(Backend):
     """Redis-based result backend."""
 
-    def __init__(self, redis_dsn: str, result_ttl: int = 3600) -> None:
-        self.dsn = redis_dsn
-        self.result_ttl = result_ttl
+    def __init__(self, config: RedisBackendConfig) -> None:
+        self.dsn = config.dsn
+        self.result_ttl = config.result_ttl
         self._pool: redis.ConnectionPool | None = None
         self._client: redis.Redis | None = None
 
@@ -73,7 +74,7 @@ class RedisBackend(Backend):
 
     async def get_result(self, task_id: str) -> TaskResult[Any] | None:
         if not self._client:
-            raise RuntimeError("Backend not connected")
+            raise RuntimeError("Backend nƒot connected")
 
         data = await self._client.get(self._result_key(task_id))
         if data:
@@ -171,3 +172,14 @@ class RedisBackend(Backend):
                 removed += 1
 
         return removed
+
+    async def healthcheck(self) -> BackendStatus:
+        """Check the health of the backend connection."""
+        if not self._client:
+            return BackendStatus(connected=False, error="Not connected")
+
+        try:
+            await self._client.ping()  # ty:ignore[invalid-await]
+            return BackendStatus(connected=True)
+        except Exception as e:
+            return BackendStatus(connected=False, error=str(e))

@@ -1,5 +1,4 @@
 import asyncio
-from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -8,9 +7,12 @@ import pytest
 from chicory.app import Chicory
 from chicory.backend.base import Backend
 from chicory.broker.base import Broker, TaskEnvelope
+from chicory.config import ChicoryConfig, WorkerConfig
 from chicory.context import TaskContext
 from chicory.exceptions import MaxRetriesExceededError, RetryError, ValidationError
 from chicory.types import (
+    BackendStatus,
+    BrokerStatus,
     DeliveryMode,
     RetryPolicy,
     TaskMessage,
@@ -46,13 +48,25 @@ def backend() -> MagicMock:
 
 
 @pytest.fixture
-def app(broker: MagicMock, backend: MagicMock) -> MagicMock:
+def app_config() -> ChicoryConfig:
+    return ChicoryConfig(
+        validation_mode=ValidationMode.NONE,
+    )
+
+
+@pytest.fixture
+def worker_config() -> WorkerConfig:
+    return WorkerConfig()
+
+
+@pytest.fixture
+def app(broker: MagicMock, backend: MagicMock, app_config: ChicoryConfig) -> MagicMock:
     app = MagicMock(spec=Chicory)
     app.broker = broker
     app.backend = backend
     app.connect = AsyncMock()
     app.disconnect = AsyncMock()
-    app.config = SimpleNamespace(validation_mode=ValidationMode.NONE)
+    app.config = app_config
     return app
 
 
@@ -163,6 +177,7 @@ class TestWorkerProcessEnvelope:
         app: MagicMock,
         broker: MagicMock,
         backend: MagicMock,
+        worker_config: WorkerConfig,
         use_dead_letter_queue: bool,
     ) -> None:
         app.get_task.side_effect = KeyError("missing")
@@ -170,7 +185,8 @@ class TestWorkerProcessEnvelope:
         msg = TaskMessage(id="4", name="missing", args=[], kwargs={}, retries=0)
         envelope = make_envelope(msg)
 
-        worker = Worker(app, use_dead_letter_queue=use_dead_letter_queue)
+        worker_config.use_dead_letter_queue = use_dead_letter_queue
+        worker = Worker(app, config=worker_config)
 
         await worker._process_envelope(envelope)
 
@@ -189,6 +205,7 @@ class TestWorkerProcessEnvelope:
         app: MagicMock,
         broker: MagicMock,
         backend: MagicMock,
+        worker_config: WorkerConfig,
         use_dead_letter_queue: bool,
     ) -> None:
         async def fn() -> None:
@@ -200,7 +217,8 @@ class TestWorkerProcessEnvelope:
         msg = TaskMessage(id="5", name="retry", args=[], kwargs={}, retries=0)
         envelope = make_envelope(msg)
 
-        worker = Worker(app, use_dead_letter_queue=use_dead_letter_queue)
+        worker_config.use_dead_letter_queue = use_dead_letter_queue
+        worker = Worker(app, config=worker_config)
 
         await worker._process_envelope(envelope)
 
@@ -218,6 +236,7 @@ class TestWorkerProcessEnvelope:
         app: MagicMock,
         broker: MagicMock,
         backend: MagicMock,
+        worker_config: WorkerConfig,
         use_dead_letter_queue: bool,
     ) -> None:
         async def fn() -> None:
@@ -229,7 +248,8 @@ class TestWorkerProcessEnvelope:
         msg = TaskMessage(id="6", name="max", args=[], kwargs={}, retries=0)
         envelope = make_envelope(msg)
 
-        worker = Worker(app, use_dead_letter_queue=use_dead_letter_queue)
+        worker_config.use_dead_letter_queue = use_dead_letter_queue
+        worker = Worker(app, config=worker_config)
 
         await worker._process_envelope(envelope)
 
@@ -249,6 +269,7 @@ class TestWorkerProcessEnvelope:
         app: MagicMock,
         broker: MagicMock,
         backend: MagicMock,
+        worker_config: WorkerConfig,
         use_dead_letter_queue: bool,
     ) -> None:
         async def fn() -> None:
@@ -260,7 +281,8 @@ class TestWorkerProcessEnvelope:
         msg = TaskMessage(id="7", name="val", args=[], kwargs={}, retries=0)
         envelope = make_envelope(msg)
 
-        worker = Worker(app, use_dead_letter_queue=use_dead_letter_queue)
+        worker_config.use_dead_letter_queue = use_dead_letter_queue
+        worker = Worker(app, config=worker_config)
 
         await worker._process_envelope(envelope)
 
@@ -280,6 +302,7 @@ class TestWorkerProcessEnvelope:
         app: MagicMock,
         broker: MagicMock,
         backend: MagicMock,
+        worker_config: WorkerConfig,
         use_dead_letter_queue: bool,
     ) -> None:
         async def fn() -> None:
@@ -291,7 +314,8 @@ class TestWorkerProcessEnvelope:
         msg = TaskMessage(id="8", name="boom_no_retry", args=[], kwargs={}, retries=0)
         envelope = make_envelope(msg)
 
-        worker = Worker(app, use_dead_letter_queue=use_dead_letter_queue)
+        worker_config.use_dead_letter_queue = use_dead_letter_queue
+        worker = Worker(app, config=worker_config)
 
         await worker._process_envelope(envelope)
 
@@ -438,6 +462,7 @@ class TestWorkerProcessEnvelope:
         app: MagicMock,
         broker: MagicMock,
         backend: MagicMock,
+        worker_config: WorkerConfig,
     ) -> None:
         async def fn() -> None:
             raise MaxRetriesExceededError()
@@ -450,7 +475,8 @@ class TestWorkerProcessEnvelope:
 
         broker.move_to_dlq.side_effect = RuntimeError("DLQ failure")
 
-        worker = Worker(app, use_dead_letter_queue=True)
+        worker_config.use_dead_letter_queue = True
+        worker = Worker(app, config=worker_config)
 
         await worker._process_envelope(envelope)
 
@@ -467,6 +493,7 @@ class TestWorkerProcessEnvelope:
         app: MagicMock,
         broker: MagicMock,
         backend: MagicMock,
+        worker_config: WorkerConfig,
         use_dead_letter_queue: bool,
     ) -> None:
         async def fn() -> None:
@@ -486,7 +513,8 @@ class TestWorkerProcessEnvelope:
         msg = TaskMessage(id="11", name="no_retry", args=[], kwargs={}, retries=0)
         envelope = make_envelope(msg)
 
-        worker = Worker(app, use_dead_letter_queue=use_dead_letter_queue)
+        worker_config.use_dead_letter_queue = use_dead_letter_queue
+        worker = Worker(app, config=worker_config)
 
         await worker._process_envelope(envelope)
 
@@ -507,20 +535,24 @@ class TestWorkerProcessEnvelope:
 
 @pytest.mark.asyncio
 class TestWorkerExecuteTask:
-    async def test_execute_async_task_without_context(self) -> None:
+    async def test_execute_async_task_without_context(
+        self, worker_config: WorkerConfig
+    ) -> None:
         async def fn(x: int, y: int) -> int:
             return x + y
 
         task = make_task(fn=fn, is_async=True, has_context=False)
         message = TaskMessage(id="1", name="add", args=[2, 3], kwargs={}, retries=0)
 
-        worker = Worker(MagicMock())
+        worker = Worker(MagicMock(), config=worker_config)
 
         result = await worker._execute_task(task, message)
 
         assert result == 5
 
-    async def test_execute_sync_task_with_context(self) -> None:
+    async def test_execute_sync_task_with_context(
+        self, worker_config: WorkerConfig
+    ) -> None:
         def fn(ctx: TaskContext, x: int) -> int:
             assert isinstance(ctx, TaskContext)
             return x * 2
@@ -528,7 +560,7 @@ class TestWorkerExecuteTask:
         task = make_task(fn=fn, is_async=False, has_context=True)
         message = TaskMessage(id="2", name="double", args=[4], kwargs={}, retries=0)
 
-        worker = Worker(MagicMock())
+        worker = Worker(MagicMock(), config=worker_config)
 
         result = await worker._execute_task(task, message)
 
@@ -777,8 +809,11 @@ class TestWorkerHeartbeat:
     async def test_heartbeat_sends_heartbeats(
         self,
         app: MagicMock,
+        worker_config: WorkerConfig,
     ) -> None:
-        worker = Worker(app, heartbeat_interval=0.1, heartbeat_ttl=1)
+        worker_config.heartbeat_interval = 0.1
+        worker_config.heartbeat_ttl = 1
+        worker = Worker(app, config=worker_config)
 
         async def stop_worker_after_delay() -> None:
             await asyncio.sleep(0.3)
@@ -792,8 +827,12 @@ class TestWorkerHeartbeat:
         expected_calls = 3
         assert app.backend.store_heartbeat.await_count == expected_calls
 
-    async def test_heartbeat_fails(self, app: MagicMock) -> None:
-        worker = Worker(app, heartbeat_interval=0.1, heartbeat_ttl=1)
+    async def test_heartbeat_fails(
+        self, app: MagicMock, worker_config: WorkerConfig
+    ) -> None:
+        worker_config.heartbeat_interval = 0.1
+        worker_config.heartbeat_ttl = 1
+        worker = Worker(app, config=worker_config)
         app.backend.store_heartbeat.side_effect = [
             RuntimeError("boom"),  # First call fails
             None,  # Second call succeeds
@@ -812,8 +851,12 @@ class TestWorkerHeartbeat:
         # Should have attempted 3 heartbeats (first failed, others succeeded)
         assert app.backend.store_heartbeat.await_count == 3
 
-    async def test_heartbeat_no_backend(self, app: MagicMock) -> None:
-        worker = Worker(app, heartbeat_interval=0.1, heartbeat_ttl=1)
+    async def test_heartbeat_no_backend(
+        self, app: MagicMock, worker_config: WorkerConfig
+    ) -> None:
+        worker_config.heartbeat_interval = 0.1
+        worker_config.heartbeat_ttl = 1
+        worker = Worker(app, config=worker_config)
         app.backend = None  # Simulate no backend
 
         async def stop_worker_after_delay() -> None:
@@ -834,13 +877,17 @@ class TestWorkerHealtcheck:
         self,
         app: MagicMock,
     ) -> None:
-        app.broker._client = AsyncMock()
-        app.backend._client = AsyncMock()
+        broker_status = BrokerStatus(connected=True)
+        backend_status = BackendStatus(connected=True)
+        app.broker.healthcheck = AsyncMock(return_value=broker_status)
+        app.backend.healthcheck = AsyncMock(return_value=backend_status)
         worker = Worker(app)
 
         stats = await worker.healthcheck()
         assert stats.broker is not None
         assert stats.backend is not None
+        assert stats.broker == broker_status
+        assert stats.backend == backend_status
         assert stats.broker.connected is True
         assert stats.backend.connected is True
 
@@ -848,15 +895,18 @@ class TestWorkerHealtcheck:
         self,
         app: MagicMock,
     ) -> None:
-        app.broker._client = AsyncMock()
-        app.broker._client.ping = AsyncMock(side_effect=ConnectionError("down"))
-        app.backend._client = AsyncMock()
+        broker_status = BrokerStatus(connected=False, error="Connection lost")
+        backend_status = BackendStatus(connected=True)
+        app.broker.healthcheck = AsyncMock(return_value=broker_status)
+        app.backend.healthcheck = AsyncMock(return_value=backend_status)
 
         worker = Worker(app)
 
         stats = await worker.healthcheck()
         assert stats.broker is not None
         assert stats.backend is not None
+        assert stats.broker == broker_status
+        assert stats.backend == backend_status
         assert stats.broker.connected is False
         assert stats.backend.connected is True
 
@@ -864,14 +914,17 @@ class TestWorkerHealtcheck:
         self,
         app: MagicMock,
     ) -> None:
-        app.broker._client = AsyncMock()
-        app.backend._client = AsyncMock()
-        app.backend._client.ping = AsyncMock(side_effect=ConnectionError("down"))
+        broker_status = BrokerStatus(connected=True)
+        backend_status = BackendStatus(connected=False, error="Connection lost")
+        app.broker.healthcheck = AsyncMock(return_value=broker_status)
+        app.backend.healthcheck = AsyncMock(return_value=backend_status)
 
         worker = Worker(app)
 
         stats = await worker.healthcheck()
         assert stats.broker is not None
         assert stats.backend is not None
+        assert stats.broker == broker_status
+        assert stats.backend == backend_status
         assert stats.broker.connected is True
         assert stats.backend.connected is False

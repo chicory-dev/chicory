@@ -1,10 +1,10 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-    from chicory.types import TaskMessage
+    from chicory.types import BrokerStatus, TaskMessage
 
 DEFAULT_QUEUE = "default"
 
@@ -29,6 +29,7 @@ class DLQMessage:
     retry_count: int
 
 
+@runtime_checkable
 class Broker(Protocol):
     """Protocol for message brokers."""
 
@@ -109,4 +110,8 @@ class Broker(Protocol):
 
     async def purge_queue(self, queue: str = DEFAULT_QUEUE) -> int:
         """Delete all messages from queue. Returns count deleted."""
+        raise NotImplementedError
+
+    async def healthcheck(self) -> BrokerStatus:
+        """Check the health of the broker connection."""
         raise NotImplementedError

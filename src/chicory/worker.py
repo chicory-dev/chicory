@@ -9,15 +9,11 @@ import traceback
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
-from multiprocessing import cpu_count
 from typing import TYPE_CHECKING, Any
 
-from chicory.broker.base import DEFAULT_QUEUE, TaskEnvelope
 from chicory.context import TaskContext
 from chicory.exceptions import MaxRetriesExceededError, RetryError, ValidationError
 from chicory.types import (
-    BackendStatus,
-    BrokerStatus,
     DeliveryMode,
     RetryPolicy,
     TaskMessage,
@@ -29,11 +25,11 @@ from chicory.types import (
 
 if TYPE_CHECKING:
     from chicory.app import Chicory
+    from chicory.broker.base import TaskEnvelope
+    from chicory.config import WorkerConfig
     from chicory.task import Task
 
 logger = logging.getLogger("chicory.worker")
-
-DEFAULT_CONCURRENCY = min(32, 4 * cpu_count())
 
 
 class Worker:
@@ -46,22 +42,28 @@ class Worker:
     def __init__(
         self,
         app: Chicory,
-        concurrency: int = DEFAULT_CONCURRENCY,
-        queue: str = DEFAULT_QUEUE,
-        use_dead_letter_queue: bool = False,
-        heartbeat_interval: float = 10.0,
-        heartbeat_ttl: int = 30,
+        config: WorkerConfig | None = None,
     ) -> None:
+        """
+        Initialize a worker.
+
+        Args:
+            app: The Chicory application instance
+            config: WorkerConfig instance. If not provided, uses app.config.worker
+        """
         self.app = app
-        self.concurrency = concurrency
-        self.queue = queue
-        self.use_dead_letter_queue = use_dead_letter_queue
-        self.heartbeat_interval = heartbeat_interval
-        self.heartbeat_ttl = heartbeat_ttl
+        self.config = config or app.config.worker
+
+        # Set attributes from config
+        self.concurrency = self.config.concurrency
+        self.queue = self.config.queue
+        self.use_dead_letter_queue = self.config.use_dead_letter_queue
+        self.heartbeat_interval = self.config.heartbeat_interval
+        self.heartbeat_ttl = self.config.heartbeat_ttl
 
         self._running = False
-        self._executor = ThreadPoolExecutor(max_workers=concurrency)
-        self._semaphore = asyncio.Semaphore(concurrency)
+        self._executor = ThreadPoolExecutor(max_workers=self.concurrency)
+        self._semaphore = asyncio.Semaphore(self.concurrency)
         self._tasks: set[asyncio.Task[Any]] = set()
         self._consume_task: asyncio.Task[None] | None = None
         self._heartbeat_task: asyncio.Task[None] | None = None
@@ -77,7 +79,7 @@ class Worker:
 
         logger.info(
             f"Initialized worker {self.worker_id}",
-            extra={"worker_id": self.worker_id, "queue": queue},
+            extra={"worker_id": self.worker_id, "queue": self.queue},
         )
 
     async def start(self) -> None:
@@ -103,16 +105,20 @@ class Worker:
         # Start heartbeat loop
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 
-    async def stop(self, timeout: float = 30.0) -> None:
+    async def stop(self, timeout: float | None = None) -> None:
         """
         Stop the worker gracefully.
 
         Args:
-            timeout: Maximum time to wait for tasks to complete (seconds)
+            timeout: Maximum time to wait for tasks to complete (seconds).
+                    If None, uses config.shutdown_timeout
         """
         if not self._running:
             logger.warning("Worker is not running")
             return
+
+        if timeout is None:
+            timeout = self.config.shutdown_timeout
 
         logger.info("Stopping worker...")
         self._running = False
@@ -548,20 +554,10 @@ class Worker:
         stats = self.get_stats()
 
         # Check broker connectivity
-        try:
-            if self.app.broker._client:
-                await self.app.broker._client.ping()
-                stats.broker = BrokerStatus(connected=True)
-        except Exception as e:
-            stats.broker = BrokerStatus(connected=False, error=str(e))
+        stats.broker = await self.app.broker.healthcheck()
 
         # Check backend connectivity
         if self.app.backend:
-            try:
-                if self.app.backend._client:
-                    await self.app.backend._client.ping()
-                    stats.backend = BackendStatus(connected=True)
-            except Exception as e:
-                stats.backend = BackendStatus(connected=False, error=str(e))
+            stats.backend = await self.app.backend.healthcheck()
 
         return stats
