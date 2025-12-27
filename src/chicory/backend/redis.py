@@ -74,7 +74,7 @@ class RedisBackend(Backend):
 
     async def get_result(self, task_id: str) -> TaskResult[Any] | None:
         if not self._client:
-            raise RuntimeError("Backend nƒot connected")
+            raise RuntimeError("Backend not connected")
 
         data = await self._client.get(self._result_key(task_id))
         if data:
