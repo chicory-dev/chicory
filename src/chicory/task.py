@@ -84,11 +84,10 @@ class Task(Generic[P, R]):  # noqa: UP046
 
     def _validate_inputs(self, *args: P.args, **kwargs: P.kwargs) -> dict[str, Any]:
         """Validate and convert inputs using Pydantic."""
+        hints = get_type_hints(self.fn)
         sig = inspect.signature(self.fn)
         params = [
-            p
-            for p in sig.parameters.values()
-            if not (p.name == "ctx" and p.annotation is TaskContext)
+            p for p in sig.parameters.values() if hints.get(p.name) is not TaskContext
         ]
 
         # Bind args to parameter names

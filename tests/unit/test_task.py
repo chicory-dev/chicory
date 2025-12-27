@@ -12,6 +12,21 @@ from chicory.task import Task
 from chicory.types import BrokerType, TaskOptions, ValidationMode
 
 
+def create_mock_function(
+    name: str = "test_fn",
+    module: str = "test_module",
+    annotations: dict | None = None,
+) -> MagicMock:
+    """Create a mock function that works with inspect and get_type_hints."""
+    mock_fn = MagicMock()
+    mock_fn.__module__ = module
+    mock_fn.__name__ = name
+    mock_fn.__annotations__ = annotations or {}
+    mock_fn.__globals__ = {}
+    mock_fn.__code__ = MagicMock(co_filename=f"/{module.replace('.', '/')}.py")
+    return mock_fn
+
+
 class TestTaskBuildInputModel:
     def test_build_input_model_with_context(self) -> None:
         app = Mock(spec=Chicory)
@@ -315,9 +330,10 @@ class TestTaskResolveTaskName:
         options = TaskOptions()
 
         # Create a mock function from __main__ that can be resolved
-        mock_fn = MagicMock()
-        mock_fn.__module__ = "__main__"
-        mock_fn.__name__ = "my_task"
+        mock_fn = create_mock_function(
+            name="my_task",
+            module="__main__",
+        )
         mock_fn.__code__ = MagicMock(co_filename="/path/to/myapp/tasks.py")
 
         # Mock resolve_module_name to return a valid module
@@ -385,9 +401,10 @@ class TestTaskResolveTaskName:
         app = Chicory(broker=BrokerType.REDIS)
         options = TaskOptions()
 
-        mock_fn = MagicMock()
-        mock_fn.__module__ = "myapp.submodule.tasks"
-        mock_fn.__name__ = "nested_task"
+        mock_fn = create_mock_function(
+            name="nested_task",
+            module="myapp.submodule.tasks",
+        )
 
         task = Task(fn=mock_fn, app=app, options=options)
         assert task.name == "myapp.submodule.tasks.nested_task"
@@ -493,9 +510,10 @@ class TestTaskResolveTaskName:
         """Test that explicit name works even for __main__ functions."""
         app = Chicory(broker=BrokerType.REDIS)
 
-        mock_fn = MagicMock()
-        mock_fn.__module__ = "__main__"
-        mock_fn.__name__ = "main_task"
+        mock_fn = create_mock_function(
+            name="main_task",
+            module="__main__",
+        )
         mock_fn.__code__ = MagicMock(co_filename="<stdin>")
 
         # Explicit name should bypass __main__ check
