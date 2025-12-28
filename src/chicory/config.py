@@ -317,6 +317,7 @@ class BrokerConfig(BaseSettings):
     )
 
     redis: RedisBrokerConfig = Field(default_factory=RedisBrokerConfig)
+    rabbitmq: RabbitMQBrokerConfig = Field(default_factory=RabbitMQBrokerConfig)
 
 
 class BackendConfig(BaseSettings):

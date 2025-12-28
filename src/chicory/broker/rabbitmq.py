@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -32,6 +33,7 @@ class DLQData(BaseModel):
     task_id: str
     task_name: str
     original_queue: str
+    moved_by: str
 
 
 class RabbitMQBroker(Broker):
@@ -56,12 +58,11 @@ class RabbitMQBroker(Broker):
         self.queue_mode = config.queue_mode
 
         self.delivery_mode = delivery_mode
-        self.consumer_name = consumer_name
+        self.consumer_tag = consumer_name or f"worker-{uuid.uuid4().hex[:8]}"
 
         self._connection_pool: Pool[AbstractRobustConnection] | None = None
         self._channel_pool: Pool[AbstractChannel] | None = None
         self._running = False
-        self._consumer_tag: str | None = None
 
     async def _get_connection(self) -> AbstractRobustConnection:
         """Create a new RobustConnection to RabbitMQ."""
@@ -206,6 +207,7 @@ class RabbitMQBroker(Broker):
                     "task_id": message.id,
                     "task_name": message.name,
                     "scheduled_for": message.eta.isoformat(),
+                    "published_by": self.consumer_tag,
                 },
             ),
             routing_key=self._delayed_queue_name(queue),
@@ -262,6 +264,7 @@ class RabbitMQBroker(Broker):
                         "task_id": message.id,
                         "task_name": message.name,
                         "retries": message.retries,
+                        "published_by": self.consumer_tag,
                     },
                 ),
                 routing_key=self._queue_name(queue),
@@ -281,7 +284,9 @@ class RabbitMQBroker(Broker):
             self._running = True
 
             # Start consuming
-            async with rabbit_queue.iterator() as queue_iter:
+            async with rabbit_queue.iterator(
+                consumer_tag=self.consumer_tag
+            ) as queue_iter:
                 async for message in queue_iter:
                     if not self._running:
                         break
@@ -308,6 +313,10 @@ class RabbitMQBroker(Broker):
 
                     except Exception:
                         # Malformed message - acknowledge and skip
+                        logger.warning(
+                            "Malformed message received, acknowledging and skipping",
+                            exc_info=True,
+                        )
                         await message.ack()
                         continue
 
@@ -356,6 +365,7 @@ class RabbitMQBroker(Broker):
                 task_id=envelope.message.id,
                 task_name=envelope.message.name,
                 original_queue=queue,
+                moved_by=self.consumer_tag,
             )
 
             await channel.default_exchange.publish(
@@ -371,6 +381,7 @@ class RabbitMQBroker(Broker):
                         "task_name": envelope.message.name,
                         "original_queue": queue,
                         "failed_at": datetime.now(UTC).isoformat(),
+                        "moved_by": self.consumer_tag,
                     },
                 ),
                 routing_key=dlq.name,
