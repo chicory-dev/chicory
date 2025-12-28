@@ -10,13 +10,13 @@ import redis.asyncio as redis
 from chicory.config import RedisBrokerConfig  # noqa: TC001
 from chicory.types import BrokerStatus, DeliveryMode, TaskMessage
 
-from .base import DEFAULT_QUEUE, Broker, DLQMessage, TaskEnvelope
+from .base import DEFAULT_QUEUE, DLQMessage, TaskEnvelope
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 
-class RedisBroker(Broker):
+class RedisBroker:
     """
     Redis Streams-based message broker with DLQ and configurable delivery semantics.
     """
@@ -51,6 +51,8 @@ class RedisBroker(Broker):
         await self._client.ping()  # type: ignore[unused-awaitable]
 
     async def disconnect(self) -> None:
+        self.stop()
+
         if self._client:
             await self._client.close()
             self._client = None

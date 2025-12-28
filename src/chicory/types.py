@@ -226,6 +226,7 @@ class WorkerStats(BaseModel):
 
 class BrokerType(StrEnum):
     REDIS = "redis"
+    RABBITMQ = "rabbitmq"
 
 
 class BackendType(StrEnum):

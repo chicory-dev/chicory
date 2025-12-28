@@ -20,6 +20,7 @@ class TaskEnvelope:
     message: TaskMessage
     delivery_tag: str  # broker-specific identifier for ack/nack
     raw_data: bytes | None = None
+    _raw_message: object | None = None  # Broker-specific message object
 
 
 @dataclass
@@ -88,6 +89,7 @@ class Broker(Protocol):
         self,
         message_id: str,
         queue: str = DEFAULT_QUEUE,
+        reset_retries: bool = True,
     ) -> bool:
         """Move a message from DLQ back to the main queue for reprocessing."""
         raise NotImplementedError
@@ -102,6 +104,9 @@ class Broker(Protocol):
 
     async def get_dlq_count(self, queue: str = DEFAULT_QUEUE) -> int:
         """Get the number of messages in the Dead Letter Queue."""
+        raise NotImplementedError
+
+    async def get_pending_count(self, queue: str = DEFAULT_QUEUE) -> int:
         raise NotImplementedError
 
     async def get_queue_size(self, queue: str = DEFAULT_QUEUE) -> int:
