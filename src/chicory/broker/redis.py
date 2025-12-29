@@ -51,6 +51,8 @@ class RedisBroker(Broker):
         await self._client.ping()  # type: ignore[unused-awaitable]
 
     async def disconnect(self) -> None:
+        self.stop()
+
         if self._client:
             await self._client.close()
             self._client = None
@@ -213,12 +215,6 @@ class RedisBroker(Broker):
                                     if isinstance(msg_id, bytes)
                                     else msg_id
                                 )
-
-                                # AT_MOST_ONCE: ack immediately before processing
-                                if self.delivery_mode == DeliveryMode.AT_MOST_ONCE:
-                                    await self._client.xack(
-                                        stream_key, self.consumer_group, msg_id
-                                    )
 
                                 yield TaskEnvelope(
                                     message=message,

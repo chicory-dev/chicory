@@ -3,7 +3,14 @@ from __future__ import annotations
 import os
 from typing import Literal, Self
 
-from pydantic import Field, RedisDsn, SecretStr, field_validator, model_validator
+from pydantic import (
+    AmqpDsn,
+    Field,
+    RedisDsn,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from chicory.types import DeliveryMode, ValidationMode
@@ -99,6 +106,129 @@ class RedisBrokerConfig(BaseBrokerConfig):
                 host=self.host,
                 port=self.port,
                 path=str(self.db),
+            )
+        )
+
+
+class RabbitMQBrokerConfig(BaseBrokerConfig):
+    """RabbitMQ broker configuration."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_prefix="CHICORY_BROKER_RABBITMQ_",
+        extra="ignore",
+    )
+
+    host: str = Field(default="localhost", description="RabbitMQ host")
+    port: int = Field(default=5672, ge=1, le=65535, description="RabbitMQ port")
+    username: str = Field(default="guest", description="RabbitMQ username")
+    password: SecretStr = Field(
+        default=SecretStr("guest"), description="RabbitMQ password"
+    )
+    vhost: str | None = Field(default=None, description="RabbitMQ virtual host")
+    url: str | None = Field(
+        default=None,
+        description="Full AMQP URL (overrides host/port if set)",
+    )
+
+    connection_pool_size: int = Field(
+        default=1,
+        ge=1,
+        description="Number of connections in the pool",
+    )
+    channel_pool_size: int = Field(
+        default=10,
+        ge=1,
+        description="Number of channels in the pool",
+    )
+    prefetch_count: int = Field(
+        default=1,
+        ge=1,
+        description="Number of messages to prefetch per consumer (QoS)",
+    )
+    queue_max_length: int | None = Field(
+        default=None,
+        ge=1,
+        description="Maximum number of messages in queue (None for unlimited)",
+    )
+    queue_max_length_bytes: int | None = Field(
+        default=None,
+        ge=1,
+        description="Maximum size in bytes for queue (None for unlimited)",
+    )
+    dlq_max_length: int | None = Field(
+        default=10000,
+        ge=1,
+        description="Maximum number of messages in DLQ (None for unlimited)",
+    )
+    message_ttl: int | None = Field(
+        default=None,
+        ge=1,
+        description="Message TTL in milliseconds (None for no expiration)",
+    )
+    dlq_message_ttl: int | None = Field(
+        default=None,
+        ge=1,
+        description="DLQ message TTL in milliseconds (None for no expiration)",
+    )
+    durable_queues: bool = Field(
+        default=True,
+        description="Whether queues should be durable (survive broker restarts)",
+    )
+    queue_mode: Literal["default", "lazy"] | None = Field(
+        default=None,
+        description=(
+            "Queue mode: 'lazy' moves messages to disk ASAP, 'default' keeps in memory"
+        ),
+    )
+    max_priority: int | None = Field(
+        default=None,
+        ge=1,
+        le=255,
+        description="Maximum priority level for priority queues (None for no priority)",
+    )
+    channel_acquire_timeout: float = Field(
+        default=10.0,
+        gt=0,
+        description="Timeout in seconds when acquiring a channel from the pool",
+    )
+    reconnect_delay_base: float = Field(
+        default=1.0,
+        gt=0,
+        description="Base delay in seconds for reconnection attempts",
+    )
+    reconnect_delay_max: float = Field(
+        default=60.0,
+        gt=0,
+        description="Maximum delay in seconds for reconnection attempts",
+    )
+    max_dlq_scan_limit: int = Field(
+        default=10000,
+        ge=1,
+        description="Maximum number of messages to scan when processing DLQ",
+    )
+
+    @field_validator("url", mode="after")
+    @classmethod
+    def validate_url(cls, v: str | None) -> str | None:
+        if v is not None:
+            AmqpDsn(v)
+        return v
+
+    @property
+    def dsn(self) -> str:
+        """Build RabbitMQ DSN from config."""
+        if self.url:
+            return str(AmqpDsn(self.url))
+        return str(
+            AmqpDsn.build(
+                scheme="amqp",
+                username=self.username,
+                password=self.password.get_secret_value() if self.password else None,
+                host=self.host,
+                port=self.port,
+                path=self.vhost,
             )
         )
 
@@ -213,6 +343,7 @@ class BrokerConfig(BaseSettings):
     )
 
     redis: RedisBrokerConfig = Field(default_factory=RedisBrokerConfig)
+    rabbitmq: RabbitMQBrokerConfig = Field(default_factory=RabbitMQBrokerConfig)
 
 
 class BackendConfig(BaseSettings):

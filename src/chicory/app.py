@@ -4,7 +4,7 @@ import logging
 from typing import TYPE_CHECKING, Any, overload
 
 from chicory.backend import Backend, RedisBackend
-from chicory.broker import Broker, RedisBroker
+from chicory.broker import Broker, RabbitMQBroker, RedisBroker
 from chicory.config import ChicoryConfig
 from chicory.exceptions import TaskNotFoundError
 from chicory.task import Task
@@ -76,6 +76,11 @@ class Chicory:
             case BrokerType.REDIS:
                 return RedisBroker(
                     config=self.config.broker.redis,
+                    delivery_mode=self.config.delivery_mode,
+                )
+            case BrokerType.RABBITMQ:
+                return RabbitMQBroker(
+                    config=self.config.broker.rabbitmq,
                     delivery_mode=self.config.delivery_mode,
                 )
             case _:

@@ -131,7 +131,14 @@ class TaskMessage(BaseModel):
     eta: datetime | None = Field(
         default=None, description="Earliest time at which the task can be executed"
     )
-    # New fields for DLQ tracking
+    # Priority queues (RabbitMQ)
+    priority: int | None = Field(
+        default=None,
+        ge=0,
+        le=255,
+        description="Message priority (0-255, higher = more priority)",
+    )
+    # DLQ tracking
     first_failure_at: datetime | None = Field(
         default=None, description="Timestamp of the first failure"
     )
@@ -226,6 +233,7 @@ class WorkerStats(BaseModel):
 
 class BrokerType(StrEnum):
     REDIS = "redis"
+    RABBITMQ = "rabbitmq"
 
 
 class BackendType(StrEnum):
