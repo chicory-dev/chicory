@@ -182,6 +182,32 @@ class RabbitMQBrokerConfig(BaseBrokerConfig):
             "Queue mode: 'lazy' moves messages to disk ASAP, 'default' keeps in memory"
         ),
     )
+    max_priority: int | None = Field(
+        default=None,
+        ge=1,
+        le=255,
+        description="Maximum priority level for priority queues (None for no priority)",
+    )
+    channel_acquire_timeout: float = Field(
+        default=10.0,
+        gt=0,
+        description="Timeout in seconds when acquiring a channel from the pool",
+    )
+    reconnect_delay_base: float = Field(
+        default=1.0,
+        gt=0,
+        description="Base delay in seconds for reconnection attempts",
+    )
+    reconnect_delay_max: float = Field(
+        default=60.0,
+        gt=0,
+        description="Maximum delay in seconds for reconnection attempts",
+    )
+    max_dlq_scan_limit: int = Field(
+        default=10000,
+        ge=1,
+        description="Maximum number of messages to scan when processing DLQ",
+    )
 
     @field_validator("url", mode="after")
     @classmethod

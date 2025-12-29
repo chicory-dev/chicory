@@ -312,6 +312,7 @@ class Worker:
                 result = await self._execute_task(task, message)
                 await self._store_success(task_id, result, task.options.ignore_result)
 
+                # Only ack for AT_LEAST_ONCE after successful processing
                 if task.options.delivery_mode == DeliveryMode.AT_LEAST_ONCE:
                     await self.app.broker.ack(envelope)
 
