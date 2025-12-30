@@ -86,7 +86,7 @@ class DatabaseBackend(Backend):
             except exc.TimeoutError as ex:
                 await session.rollback()
                 raise DbPoolExhaustedException("db pool exhaustion") from ex
-            except:
+            except Exception:
                 await session.rollback()
                 raise
             else:
@@ -301,14 +301,12 @@ class DatabaseBackend(Backend):
     async def cleanup_stale_workers(self, stale_seconds: int = 60) -> int:
         """Remove expired worker heartbeats. Returns count of removed records."""
         async with self._get_db_session_from_pool() as session:
-            now = datetime.now(UTC)
-            stmt = (
-                delete(WorkerHeartbeatModel)
-                .where(WorkerHeartbeatModel.expires_at <= now)
-                .returning(WorkerHeartbeatModel.worker_id)
+            cutoff = datetime.now(UTC) - timedelta(seconds=stale_seconds)
+            stmt = delete(WorkerHeartbeatModel).where(
+                WorkerHeartbeatModel.expires_at <= cutoff
             )
             result = await session.execute(stmt)
-            return len(result.fetchall())
+            return result.rowcount  # ty:ignore[unresolved-attribute]
 
     async def healthcheck(self) -> BackendStatus:
         """Check the health of the backend connection."""
@@ -333,10 +331,6 @@ class DatabaseBackend(Backend):
         """
         async with self._get_db_session_from_pool() as session:
             cutoff = datetime.now(UTC) - timedelta(seconds=older_than_seconds)
-            stmt = (
-                delete(TaskResultModel)
-                .where(TaskResultModel.updated_at < cutoff)
-                .returning(TaskResultModel.task_id)
-            )
+            stmt = delete(TaskResultModel).where(TaskResultModel.updated_at < cutoff)
             result = await session.execute(stmt)
-            return len(result.fetchall())
+            return result.rowcount  # ty:ignore[unresolved-attribute]

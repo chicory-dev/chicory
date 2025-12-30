@@ -37,8 +37,6 @@ services:
       - POSTGRES_PORT=5432
     volumes:
       - postgres_data:/var/lib/postgresql/data/
-      - ./migration-cli/migration-import:/migration-import:ro
-      - ./migration-cli/data/preprocessed:/migration-import:ro
     ports:
       - "5432:5432"
     expose:

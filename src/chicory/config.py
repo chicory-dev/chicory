@@ -572,8 +572,8 @@ class SQLiteBackendConfig(BaseBackendConfig):
     @classmethod
     def validate_url(cls, v: str | None) -> str | None:
         if v is not None:
-            dsn = AnyUrl(v)
-            if dsn.scheme != "sqlite+aiosqlite":
+            scheme = v.split(":///")[0]
+            if scheme != "sqlite+aiosqlite":
                 raise ValueError("SQLite DSN must use 'sqlite+aiosqlite' scheme")
         return v
 
@@ -581,13 +581,8 @@ class SQLiteBackendConfig(BaseBackendConfig):
     def dsn(self) -> str:
         """Build SQLite DSN from config."""
         if self.url:
-            return str(AnyUrl(self.url))
-        return str(
-            AnyUrl.build(
-                scheme="sqlite+aiosqlite",
-                host=self.file_path,
-            )
-        )
+            return self.url
+        return f"sqlite+aiosqlite:///{self.file_path}"
 
 
 class WorkerConfig(BaseSettings):

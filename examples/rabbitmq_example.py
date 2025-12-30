@@ -98,19 +98,23 @@ async def multiply(x: int, y: int) -> int:
         jitter=True,  # Add randomness to prevent thundering herd
     ),
 )
-async def flaky_api_call(url: str, attempt: int = 1) -> dict[str, Any]:
+async def flaky_api_call(ctx: TaskContext, url: str) -> dict[str, Any]:
     """
     Simulates an unreliable API call with exponential backoff.
-    Will retry up to 5 times with increasing delays.
+    Succeeds after 2 retries.
     """
-    logger.info(f"Calling API: {url} (attempt {attempt})")
+    logger.info(f"Calling API: {url} (attempt {ctx.retries + 1})")
 
     # Simulate failure on first 2 attempts
-    if attempt <= 2:
-        logger.warning(f"API call failed on attempt {attempt}")
-        raise ConnectionError(f"API unavailable (attempt {attempt})")
+    if ctx.retries < 2:
+        logger.warning(f"API call failed on attempt {ctx.retries + 1}")
+        raise ConnectionError(f"API unavailable (attempt {ctx.retries + 1})")
 
-    return {"status": "success", "data": f"Response from {url}", "attempt": attempt}
+    return {
+        "status": "success",
+        "data": f"Response from {url}",
+        "attempt": ctx.retries + 1,
+    }
 
 
 @app.task(
@@ -291,7 +295,7 @@ async def demo_retry_policies():
 
     # Exponential backoff - simulates recovering API
     logger.info("\n→ Testing exponential backoff (will retry and succeed)...")
-    result = await flaky_api_call.delay("https://api.example.com/data", attempt=1)
+    result = await flaky_api_call.delay("https://api.example.com/data")
     logger.info(f"  Task ID: {result.task_id}")
 
     # Manual retry with context
