@@ -79,10 +79,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/dadodimauro/chicory"
-Documentation = "https://github.com/dadodimauro/chicory#readme"
-Repository = "https://github.com/dadodimauro/chicory"
-Issues = "https://github.com/dadodimauro/chicory/issues"
+Homepage = "https://github.com/chicory-dev/chicory"
+Documentation = "https://github.com/chicory-dev/chicory#readme"
+Repository = "https://github.com/chicory-dev/chicory"
+Issues = "https://github.com/chicory-dev/chicory/issues"
 
 [project.scripts]
 chicory = "chicory.cli:app"

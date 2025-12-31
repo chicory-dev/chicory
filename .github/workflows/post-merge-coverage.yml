@@ -20,6 +20,9 @@ jobs:
       - name: Install dependencies
         run: make init
 
+      - name: Start docker services
+        run: make up
+
       - name: Run ALL tests with coverage
         run: make test
 

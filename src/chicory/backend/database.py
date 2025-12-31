@@ -168,7 +168,7 @@ class DatabaseBackend(Backend):
             self._engine = None
             self._sessionmaker = None
 
-    # TODO @anvouk: https://github.com/dadodimauro/chicory/pull/17
+    # TODO @anvouk: https://github.com/chicory-dev/chicory/pull/17
     # Check if this methdod should run only if record exists
     async def set_state(self, task_id: str, state: TaskState) -> None:
         """Update task state without storing full result."""

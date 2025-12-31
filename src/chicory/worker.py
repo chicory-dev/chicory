@@ -377,7 +377,7 @@ class Worker:
 
         # Output validation
         if validation_mode in (ValidationMode.OUTPUTS, ValidationMode.STRICT):
-            # TODO @dadodimauro: https://github.com/dadodimauro/chicory/issues/15
+            # TODO @dadodimauro: https://github.com/chicory-dev/chicory/issues/15
             # Implement output validation
             pass  # pragma: no cover
 
