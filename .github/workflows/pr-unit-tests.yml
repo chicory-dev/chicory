@@ -28,3 +28,13 @@ jobs:
 
       - name: Run unit tests and linting
         run: make test-unit
+
+  check:
+    if: always()
+    needs: [unit-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Decide whether tests passed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}
