@@ -19,7 +19,13 @@ test: lint
 	uv run pytest -vv
 
 test-fast: lint
-	uv run pytest -vv -m "not slow"
+	uv run pytest -vv -m "not slow and not integration"
 
 test-slow: lint
-	uv run pytest -vv -m "slow"
+	uv run pytest -vv -n auto -m "slow"
+
+test-unit: lint
+	uv run pytest -vv -n auto -m "not integration"
+	
+test-integration: lint
+	uv run pytest -vv -m "integration"

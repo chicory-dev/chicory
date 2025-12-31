@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 import uuid
-from typing import TYPE_CHECKING, Any, Generic, get_type_hints
+from typing import TYPE_CHECKING, Any, Generic
 
 from pydantic import BaseModel, ConfigDict, create_model
 from pydantic import ValidationError as PydanticValidationError
@@ -30,16 +30,28 @@ class Task(Generic[P, R]):  # noqa: UP046
 
         self.name = self.options.name or self._resolve_task_name()
 
-        # Check if first param is TaskContext
+        # Check if first param is TaskContext using inspect.signature
+        # This works regardless of whether TaskContext is imported in TYPE_CHECKING
         sig = inspect.signature(fn)
         params = list(sig.parameters.values())
-        self.has_context = (
-            len(params) > 0 and get_type_hints(fn).get(params[0].name) is TaskContext
-        )
+        self.has_context = False
+        if len(params) > 0:
+            first_param = params[0]
+            annotation = first_param.annotation
+            # Check if annotation is TaskContext (runtime)
+            # or string 'TaskContext' (TYPE_CHECKING)
+            if annotation is TaskContext or (
+                isinstance(annotation, str) and annotation == "TaskContext"
+            ):
+                self.has_context = True
 
         # Build Pydantic model for validation
         self._input_model = self._build_input_model()
-        self.output_model = get_type_hints(fn).get("return", None)
+        self.output_model = (
+            sig.return_annotation
+            if sig.return_annotation != inspect.Signature.empty
+            else None
+        )
 
     def _resolve_task_name(self) -> str:
         """Determine the task name from the function."""
@@ -58,19 +70,34 @@ class Task(Generic[P, R]):  # noqa: UP046
 
         return f"{module}.{self.fn.__name__}"  # ty:ignore[possibly-missing-attribute]
 
+    def _is_context_param(self, param: inspect.Parameter) -> bool:
+        """Check if a parameter is TaskContext type."""
+        annotation = param.annotation
+        if annotation is TaskContext:
+            return True
+        return bool(isinstance(annotation, str) and annotation == "TaskContext")
+
     def _build_input_model(self) -> type[BaseModel]:
-        """Create a Pydantic model for input validation."""
-        hints = get_type_hints(self.fn)
+        """Create a Pydantic model for input validation.
+
+        Uses raw annotations from inspect.signature to avoid issues with
+        TYPE_CHECKING imports and from __future__ import annotations.
+        """
         sig = inspect.signature(self.fn)
 
-        fields: dict[str, tuple[type, Any]] = {}
+        fields: dict[str, tuple[type | str, Any]] = {}
         for name, param in sig.parameters.items():
-            # Skip TaskContext parameter using resolved type hints
-            annotation = hints.get(name, Any)
-            if annotation is TaskContext:
+            # Skip TaskContext parameter
+            if self._is_context_param(param):
                 continue
 
-            annotation = hints.get(name, Any)
+            # Get annotation directly from parameter
+            # This will be a string if from __future__ import annotations is used
+            # Or the actual type if not
+            annotation = (
+                param.annotation if param.annotation != inspect.Parameter.empty else Any
+            )
+
             if param.default is inspect.Parameter.empty:
                 fields[name] = (annotation, ...)
             else:
@@ -79,16 +106,13 @@ class Task(Generic[P, R]):  # noqa: UP046
         return create_model(
             f"{self.name}Input",
             **fields,  # type: ignore
-            __config__=ConfigDict(extra="forbid"),
+            __config__=ConfigDict(extra="forbid", arbitrary_types_allowed=True),
         )  # ty:ignore[no-matching-overload]
 
     def _validate_inputs(self, *args: P.args, **kwargs: P.kwargs) -> dict[str, Any]:
         """Validate and convert inputs using Pydantic."""
-        hints = get_type_hints(self.fn)
         sig = inspect.signature(self.fn)
-        params = [
-            p for p in sig.parameters.values() if hints.get(p.name) is not TaskContext
-        ]
+        params = [p for p in sig.parameters.values() if not self._is_context_param(p)]
 
         # Bind args to parameter names
         bound = {}
@@ -106,9 +130,6 @@ class Task(Generic[P, R]):  # noqa: UP046
             ) from e
 
     async def delay(self, *args: P.args, **kwargs: P.kwargs) -> AsyncResult[R]:
-        if not self.is_async:
-            raise TypeError("delay can only be called on async tasks")
-
         validation_mode = (
             self.options.validation_mode or self.app.config.validation_mode
         )

@@ -196,16 +196,24 @@ class TestTaskDelay:
 
     async def test_delay_non_async_task(self) -> None:
         app = Mock(spec=Chicory)
+        app.broker = Mock()
+        app.broker.publish = AsyncMock()
+        app.config = Mock()
+        app.config.validation_mode = ValidationMode.STRICT
         options = Mock(spec=TaskOptions)
         options.name = "test_task"
+        options.validation_mode = None
 
-        def task_fn(a: int) -> None:
-            pass
+        def task_fn(a: int) -> int:
+            return a
 
         task = Task(task_fn, app, options)
 
-        with pytest.raises(TypeError):
-            await task.delay(1)
+        result = await task.delay(1)
+
+        assert task.is_async is False
+        assert result.task_id is not None
+        app.broker.publish.assert_awaited_once()
 
     async def test_delay_with_input_validation_modes(self) -> None:
         app = Mock(spec=Chicory)
@@ -276,16 +284,23 @@ class TestTaskSend:
 
     async def test_send_non_async_task(self) -> None:
         app = Mock(spec=Chicory)
+        app = Mock(spec=Chicory)
+        app.broker = Mock()
+        app.broker.publish = AsyncMock()
+        app.config = Mock()
+        app.config.validation_mode = ValidationMode.STRICT
         options = Mock(spec=TaskOptions)
         options.name = "test_task"
+        options.validation_mode = None
 
-        def task_fn(a: int) -> None:
-            pass
+        def task_fn(a: int) -> int:
+            return a
 
         task = Task(task_fn, app, options)
 
-        with pytest.raises(TypeError):
-            await task.send(1)
+        assert task.is_async is False
+        result = await task.send(1)
+        assert result is not None
 
     async def test_send_without_input_validation(self) -> None:
         app = Mock(spec=Chicory)
