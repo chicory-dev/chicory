@@ -284,7 +284,6 @@ class TestTaskSend:
 
     async def test_send_non_async_task(self) -> None:
         app = Mock(spec=Chicory)
-        app = Mock(spec=Chicory)
         app.broker = Mock()
         app.broker.publish = AsyncMock()
         app.config = Mock()
