@@ -91,20 +91,24 @@ class RabbitMQBroker(Broker):
         async with self._connection_pool.acquire() as connection:
             return await connection.channel()
 
-    def _queue_name(self, queue: str) -> str:
+    @staticmethod
+    def _queue_name(queue: str) -> str:
         """Get the main queue name."""
         return f"chicory.queue.{queue}"
 
-    def _dlq_name(self, queue: str) -> str:
+    @staticmethod
+    def _dlq_name(queue: str) -> str:
         """Get the DLQ name for a queue."""
         return f"chicory.dlq.{queue}"
 
-    def _delayed_exchange_name(self, queue: str) -> str:
+    @staticmethod
+    def _delayed_exchange_name(queue: str) -> str:
         """Get the delayed exchange name for a queue."""
         return f"chicory.delayed.{queue}"
 
-    def _delayed_queue_name(self, queue: str) -> str:
-        """Get the delayed queue name."""
+    @staticmethod
+    def _delayed_queue_name(queue: str) -> str:
+        """Get the delayed queue name for a queue."""
         return f"chicory.delayed-queue.{queue}"
 
     async def _declare_queue(
@@ -550,16 +554,33 @@ class RabbitMQBroker(Broker):
                     break
 
                 try:
-                    dlq_data = DLQData.model_validate_json(message.body)
-                    original_message = TaskMessage.model_validate_json(dlq_data.data)
+                    body_str = message.body.decode()
+                    try:
+                        dlq_data = DLQData.model_validate_json(body_str)
+                        original_message = TaskMessage.model_validate_json(
+                            dlq_data.data
+                        )
+                        failed_at = dlq_data.failed_at
+                        error = dlq_data.error
+                        retry_count = dlq_data.retry_count
+                        task_id = dlq_data.task_id
+                    except Exception:
+                        # Fallback for native DLX messages
+                        original_message = TaskMessage.model_validate_json(body_str)
+                        failed_at = datetime.now(UTC).isoformat()
+                        error = message.headers.get(
+                            "x-first-death-reason", "Native DLX"
+                        )
+                        retry_count = original_message.retries
+                        task_id = original_message.id
 
                     messages.append(
                         DLQMessage(
-                            message_id=dlq_data.task_id,
+                            message_id=task_id,
                             original_message=original_message,
-                            failed_at=dlq_data.failed_at,
-                            error=dlq_data.error,
-                            retry_count=dlq_data.retry_count,
+                            failed_at=failed_at,
+                            error=str(error),
+                            retry_count=retry_count,
                         )
                     )
 
@@ -601,8 +622,19 @@ class RabbitMQBroker(Broker):
                     if not message:
                         break
 
-                    dlq_data = DLQData.model_validate_json(message.body)
-                    if dlq_data.task_id == message_id:
+                    body_str = message.body.decode()
+                    try:
+                        dlq_data = DLQData.model_validate_json(body_str)
+                        current_task_id = dlq_data.task_id
+                    except Exception:
+                        # Fallback for native DLX messages
+                        try:
+                            task_msg = TaskMessage.model_validate_json(body_str)
+                            current_task_id = task_msg.id
+                        except Exception:
+                            current_task_id = None
+
+                    if current_task_id == message_id:
                         target_message = message
                         break
                     messages_to_requeue.append(message)
@@ -621,8 +653,13 @@ class RabbitMQBroker(Broker):
                 if not target_message:
                     return False
 
-                dlq_data = DLQData.model_validate_json(target_message.body)
-                task_message = TaskMessage.model_validate_json(dlq_data.data)
+                body_str = target_message.body.decode()
+                try:
+                    dlq_data = DLQData.model_validate_json(body_str)
+                    task_message = TaskMessage.model_validate_json(dlq_data.data)
+                except Exception:
+                    # Fallback for native DLX messages
+                    task_message = TaskMessage.model_validate_json(body_str)
 
                 # Reset retry count if requested
                 if reset_retries:
@@ -677,8 +714,19 @@ class RabbitMQBroker(Broker):
                     if not message:
                         break
 
-                    dlq_data = DLQData.model_validate_json(message.body)
-                    if dlq_data.task_id == message_id:
+                    body_str = message.body.decode()
+                    try:
+                        dlq_data = DLQData.model_validate_json(body_str)
+                        current_task_id = dlq_data.task_id
+                    except Exception:
+                        # Fallback for native DLX messages
+                        try:
+                            task_msg = TaskMessage.model_validate_json(body_str)
+                            current_task_id = task_msg.id
+                        except Exception:
+                            current_task_id = None
+
+                    if current_task_id == message_id:
                         await message.ack()  # Delete it
                         found = True
                         break
@@ -706,15 +754,22 @@ class RabbitMQBroker(Broker):
                     await msg.nack(requeue=True)
                 return False
 
+    async def purge_dlq(self, queue: str = DEFAULT_QUEUE) -> int:
+        """Delete all messages from the Dead Letter Queue. Returns count deleted."""
+        async with self._acquire_channel() as channel:
+            try:
+                dlq = await self._declare_dlq(channel, queue)
+                result = await dlq.purge()
+                return result.message_count or 0
+            except Exception:
+                logger.exception("Error purging DLQ %s", queue)
+                return 0
+
     async def get_dlq_count(self, queue: str = DEFAULT_QUEUE) -> int:
         """Get the number of messages in the Dead Letter Queue."""
         async with self._acquire_channel() as channel:
-            dlq = await self._declare_dlq(channel, queue)
-
-            try:
-                return dlq.declaration_result.message_count or 0
-            except Exception:
-                return 0
+            dlq = await self._declare_dlq(channel, queue, force=True)
+            return dlq.declaration_result.message_count or 0
 
     async def get_pending_count(self, queue: str = DEFAULT_QUEUE) -> int:
         """
@@ -724,7 +779,9 @@ class RabbitMQBroker(Broker):
         """
         async with self._acquire_channel() as channel:
             try:
-                rabbit_queue = await self._declare_queue(channel, queue)
+                rabbit_queue = await self._declare_queue(
+                    channel, queue, dlq_routing=True, force=True
+                )
                 # TODO @dadodimauro:  # noqa: TD003
                 # RabbitMQ doesn't expose unacked count via AMQP directly.
                 # This returns consumer count as a proxy - real implementation
@@ -742,7 +799,9 @@ class RabbitMQBroker(Broker):
         """Get number of ready messages in queue."""
         async with self._acquire_channel() as channel:
             try:
-                rabbit_queue = await self._declare_queue(channel, queue)
+                rabbit_queue = await self._declare_queue(
+                    channel, queue, dlq_routing=True, force=True
+                )
                 return rabbit_queue.declaration_result.message_count or 0
             except Exception:
                 logger.exception("Error getting queue size for queue %s", queue)
@@ -752,7 +811,9 @@ class RabbitMQBroker(Broker):
         """Get number of active consumers."""
         async with self._acquire_channel() as channel:
             try:
-                rabbit_queue = await self._declare_queue(channel, queue)
+                rabbit_queue = await self._declare_queue(
+                    channel, queue, dlq_routing=True, force=True
+                )
                 return rabbit_queue.declaration_result.consumer_count or 0
             except Exception:
                 logger.exception("Error getting consumer count for queue %s", queue)
@@ -762,7 +823,9 @@ class RabbitMQBroker(Broker):
         """Delete all messages from queue. Returns count deleted."""
         async with self._acquire_channel() as channel:
             try:
-                rabbit_queue = await self._declare_queue(channel, queue)
+                rabbit_queue = await self._declare_queue(
+                    channel, queue, dlq_routing=True
+                )
                 result = await rabbit_queue.purge()
                 return result.message_count or 0
             except Exception:

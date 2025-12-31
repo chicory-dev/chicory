@@ -45,7 +45,6 @@ class RedisBroker(Broker):
         self._pool = redis.ConnectionPool.from_url(self.dsn)
         self._client = redis.Redis(
             connection_pool=self._pool,
-            auto_close_connection_pool=False,
             decode_responses=False,  # Keep as bytes for consistency
         )
         await self._client.ping()  # type: ignore[unused-awaitable]
@@ -54,19 +53,22 @@ class RedisBroker(Broker):
         self.stop()
 
         if self._client:
-            await self._client.close()
+            await self._client.aclose()
             self._client = None
         if self._pool:
-            await self._pool.disconnect()
+            await self._pool.aclose()
             self._pool = None
 
-    def _stream_key(self, queue: str) -> str:
+    @staticmethod
+    def _stream_key(queue: str) -> str:
         return f"chicory:stream:{queue}"
 
-    def _delayed_key(self, queue: str) -> str:
+    @staticmethod
+    def _delayed_key(queue: str) -> str:
         return f"chicory:delayed:{queue}"
 
-    def _dlq_key(self, queue: str) -> str:
+    @staticmethod
+    def _dlq_key(queue: str) -> str:
         return f"chicory:dlq:{queue}"
 
     async def _ensure_consumer_group(self, queue: str) -> None:

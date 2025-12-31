@@ -21,29 +21,31 @@ class RedisBackend(Backend):
 
     async def connect(self) -> None:
         self._pool = redis.ConnectionPool.from_url(self.dsn)
-        self._client = redis.Redis(
-            connection_pool=self._pool, auto_close_connection_pool=False
-        )
+        self._client = redis.Redis(connection_pool=self._pool)
         await self._client.ping()  # ty:ignore[invalid-await]
 
     async def disconnect(self) -> None:
         if self._client:
-            await self._client.close()
+            await self._client.aclose()
             self._client = None
         if self._pool:
-            await self._pool.disconnect()
+            await self._pool.aclose()
             self._pool = None
 
-    def _state_key(self, task_id: str) -> str:
+    @staticmethod
+    def _state_key(task_id: str) -> str:
         return f"chicory:state:{task_id}"
 
-    def _result_key(self, task_id: str) -> str:
+    @staticmethod
+    def _result_key(task_id: str) -> str:
         return f"chicory:result:{task_id}"
 
-    def _heartbeat_key(self, worker_id: str) -> str:
+    @staticmethod
+    def _heartbeat_key(worker_id: str) -> str:
         return f"chicory:heartbeat:{worker_id}"
 
-    def _workers_set_key(self) -> str:
+    @staticmethod
+    def _workers_set_key() -> str:
         """Key for tracking all worker IDs."""
         return "chicory:workers"
 

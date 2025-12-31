@@ -114,6 +114,11 @@ class Broker(ABC):
         ...
 
     @abstractmethod
+    async def purge_dlq(self, queue: str = DEFAULT_QUEUE) -> int:
+        """Delete all messages from the DLQ. Returns count deleted."""
+        ...
+
+    @abstractmethod
     async def get_dlq_count(self, queue: str = DEFAULT_QUEUE) -> int:
         """Get the number of messages in the Dead Letter Queue."""
         ...
