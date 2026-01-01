@@ -254,7 +254,7 @@ async def test_backend_cleanup_stale_workers(chicory_app: Chicory) -> None:
     await asyncio.sleep(1.1)  # Wait for TTL to expire
 
     # Cleanup stale workers
-    removed = await chicory_app.backend.cleanup_stale_workers(stale_seconds=0)
+    removed = await chicory_app.backend.cleanup_stale_clients(stale_seconds=0)
     assert isinstance(removed, int)
     assert removed >= 0
 

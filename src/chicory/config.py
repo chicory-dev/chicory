@@ -618,6 +618,16 @@ class WorkerConfig(BaseSettings):
         ge=1,
         description="Heartbeat TTL in seconds",
     )
+    cleanup_interval: float = Field(
+        default=900.0,
+        ge=30,
+        description="Interval in seconds between cleanup check for dead workers",
+    )
+    stale_workers_timeout: float = Field(
+        default=300.0,
+        ge=10,
+        description="Timeout in seconds for stale workers to be considered for deletion",
+    )
     shutdown_timeout: float = Field(
         default=30.0,
         ge=0,

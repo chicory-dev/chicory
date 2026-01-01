@@ -5,6 +5,7 @@ import contextlib
 import functools
 import logging
 import os
+import random
 import signal
 import socket
 import traceback
@@ -13,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
+from chicory.broker.base import DEFAULT_QUEUE
 from chicory.context import TaskContext
 from chicory.exceptions import MaxRetriesExceededError, RetryError, ValidationError
 from chicory.types import (
@@ -60,6 +62,8 @@ class Worker:
         self.use_dead_letter_queue = self.config.use_dead_letter_queue
         self.heartbeat_interval = self.config.heartbeat_interval
         self.heartbeat_ttl = self.config.heartbeat_ttl
+        self.cleanup_interval = Worker._jitter(self.config.cleanup_interval, 0.15)
+        self.stale_workers_timeout = self.config.stale_workers_timeout
 
         self._running = False
         self._executor = ThreadPoolExecutor(max_workers=self.concurrency)
@@ -67,6 +71,7 @@ class Worker:
         self._tasks: set[asyncio.Task[Any]] = set()
         self._consume_task: asyncio.Task[None] | None = None
         self._heartbeat_task: asyncio.Task[None] | None = None
+        self._cleanup_task: asyncio.Task[None] | None = None
 
         self.worker_id = f"{socket.gethostname()}-{os.getpid()}-{uuid.uuid4().hex[:8]}"
         self.hostname = socket.gethostname()
@@ -83,6 +88,12 @@ class Worker:
             f"Initialized worker {self.worker_id}",
             extra={"worker_id": self.worker_id, "queue": self.queue},
         )
+
+    @staticmethod
+    def _jitter(value: float, jitter_percent: float) -> float:
+        """Add random jitter to existing value."""
+        jitter_range = value * jitter_percent
+        return value + random.uniform(-jitter_range, jitter_range)
 
     async def start(self) -> None:
         """
@@ -106,6 +117,8 @@ class Worker:
         self._consume_task = asyncio.create_task(self._consume_loop())
         # Start heartbeat loop
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+        # Cleanup dead workers task
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
 
     async def stop(self, timeout: float | None = None) -> None:
         """
@@ -177,6 +190,31 @@ class Worker:
             self._logger.debug("Heartbeat loop cancelled")
         finally:
             self._logger.info("Heartbeat loop exited")
+
+    async def _cleanup_loop(self) -> None:
+        logger.info(
+            f"Starting cleanup loop (interval={self.cleanup_interval}s)",
+            extra={"worker_id": self.worker_id},
+        )
+
+        try:
+            while self._running:
+                await asyncio.sleep(self.cleanup_interval)
+                removed_backends = await self.app.backend.cleanup_stale_clients(
+                    self.stale_workers_timeout
+                )
+                removed_brokers = await self.app.broker.cleanup_stale_clients(
+                    DEFAULT_QUEUE, self.stale_workers_timeout
+                )
+                logger.info(
+                    "Cleanup completed: removed stale backends: %s, removed stale brokers: %s",
+                    removed_backends,
+                    removed_brokers,
+                )
+        except asyncio.CancelledError:
+            logger.debug("Cleanup loop cancelled")
+        finally:
+            logger.info("Cleanup loop exited")
 
     async def _send_heartbeat(self, is_running: bool = True) -> None:
         """

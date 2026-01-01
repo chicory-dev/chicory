@@ -58,8 +58,8 @@ class Backend(ABC):
         ...
 
     @abstractmethod
-    async def cleanup_stale_workers(self, stale_seconds: int = 60) -> int:
-        """Remove worker heartbeats older than stale_seconds. Returns count removed."""
+    async def cleanup_stale_clients(self, stale_seconds: float = 60.0) -> int:
+        """Remove backend clients older than stale_seconds. Returns count removed."""
         ...
 
     @abstractmethod

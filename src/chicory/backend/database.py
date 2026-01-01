@@ -298,8 +298,10 @@ class DatabaseBackend(Backend):
                 WorkerStats.model_validate_json(hb.heartbeat_json) for hb in heartbeats
             ]
 
-    async def cleanup_stale_workers(self, stale_seconds: int = 60) -> int:
-        """Remove expired worker heartbeats. Returns count of removed records."""
+    async def cleanup_stale_clients(self, stale_seconds: float = 60.0) -> int:
+        if not self._engine:
+            return 0
+
         async with self._get_db_session_from_pool() as session:
             cutoff = datetime.now(UTC) - timedelta(seconds=stale_seconds)
             stmt = delete(WorkerHeartbeatModel).where(
