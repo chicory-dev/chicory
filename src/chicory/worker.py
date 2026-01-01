@@ -240,6 +240,31 @@ class Worker:
                 "Cleanup loop exited", extra={"worker_id": self.worker_id}
             )
 
+    async def _cleanup_loop(self) -> None:
+        logger.info(
+            f"Starting cleanup loop (interval={self.cleanup_interval}s)",
+            extra={"worker_id": self.worker_id},
+        )
+
+        try:
+            while self._running:
+                await asyncio.sleep(self.cleanup_interval)
+                removed_backends = await self.app.backend.cleanup_stale_clients(
+                    self.stale_workers_timeout
+                )
+                removed_brokers = await self.app.broker.cleanup_stale_clients(
+                    DEFAULT_QUEUE, self.stale_workers_timeout
+                )
+                logger.info(
+                    "Cleanup completed: removed stale backends: %s, removed stale brokers: %s",
+                    removed_backends,
+                    removed_brokers,
+                )
+        except asyncio.CancelledError:
+            logger.debug("Cleanup loop cancelled")
+        finally:
+            logger.info("Cleanup loop exited")
+
     async def _send_heartbeat(self, is_running: bool = True) -> None:
         """
         Send heartbeat to backend/broker.
