@@ -621,7 +621,7 @@ class WorkerConfig(BaseSettings):
     cleanup_interval: float = Field(
         default=900.0,
         ge=30,
-        description="Interval in seconds between cleanup check for dead workers",
+        description="Interval in seconds between cleanup checks for dead workers",
     )
     stale_workers_timeout: float = Field(
         default=300.0,
