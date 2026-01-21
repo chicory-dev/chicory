@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 import pytest_asyncio
 
+from chicory import RedisBroker
 from chicory.broker.base import TaskEnvelope
 from chicory.exceptions import ValidationError
 from chicory.result import AsyncResult
@@ -171,6 +172,37 @@ async def test_monitoring(chicory_app: Chicory, clean_queue: None) -> None:
     purged = await chicory_app.broker.purge_queue()
     assert purged >= 2
     assert await chicory_app.broker.get_queue_size() == 0
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_backend_worker_stale_cleanup(
+    chicory_app: Chicory, chicory_worker: Worker
+) -> None:
+    @chicory_app.task(name=f"test.dummy.{uuid.uuid4().hex}")
+    async def dummy():
+        pass
+
+    await dummy.delay()
+
+    # Workers are present but not yet stale, nothing to clean up
+    cleaned_count = await chicory_app.broker.cleanup_stale_clients()
+    assert cleaned_count == 0, cleaned_count
+
+    @chicory_app.task(name=f"test.dummy_long_task.{uuid.uuid4().hex}")
+    async def dummy_long_task():
+        await asyncio.sleep(4)
+
+    await dummy.delay()
+    await asyncio.sleep(1)
+
+    # Worker is stale, should be cleaned up
+    cleaned_count = await chicory_app.broker.cleanup_stale_clients(stale_seconds=0.5)
+    if isinstance(chicory_app.broker, RedisBroker):
+        # Currently only implemented for RedisBroker
+        assert cleaned_count == 1, cleaned_count
+    else:
+        assert cleaned_count == 0, cleaned_count
 
 
 @pytest.mark.integration
