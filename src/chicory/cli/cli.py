@@ -225,7 +225,8 @@ def cleanup(
                 DEFAULT_QUEUE, stale_seconds
             )
             typer.echo(
-                f"Removed {removed_backends} stale backend(s) and {removed_brokers} stale broker(s)."
+                f"Removed {removed_backends} stale backend(s)"
+                f" and {removed_brokers} stale broker(s)."
             )
         finally:
             await chicory_app.disconnect()

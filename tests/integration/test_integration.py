@@ -207,7 +207,8 @@ async def test_backend_worker_stale_cleanup_stales_but_pending(
     asyncio.create_task(dummy.delay())
     await asyncio.sleep(2)
 
-    # Workers are present and stale, but there are still pending tasks, nothing to clean up
+    # Workers are present and stale, but there are still pending tasks,
+    # nothing to clean up
     cleaned_count = await chicory_app.broker.cleanup_stale_clients(stale_seconds=0.1)
     assert cleaned_count == 0
 

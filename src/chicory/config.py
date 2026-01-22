@@ -626,7 +626,8 @@ class WorkerConfig(BaseSettings):
     stale_workers_timeout: float = Field(
         default=300.0,
         ge=10,
-        description="Timeout in seconds for stale workers to be considered for deletion",
+        description="Timeout in seconds for stale workers to be"
+        " considered for deletion",
     )
     shutdown_timeout: float = Field(
         default=30.0,

@@ -225,7 +225,8 @@ class Worker:
                     DEFAULT_QUEUE, self.stale_workers_timeout
                 )
                 self._logger.info(
-                    "Cleanup completed: removed stale backends: %s, removed stale brokers: %s",
+                    "Cleanup completed: removed stale backends: %s,"
+                    " removed stale brokers: %s",
                     removed_backends,
                     removed_brokers,
                     extra={"worker_id": self.worker_id},
