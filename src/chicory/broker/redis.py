@@ -93,7 +93,7 @@ class RedisBroker(Broker):
         if not self._client:
             raise RuntimeError("Broker not connected")
 
-        data = message.model_dump_json()
+        data = TaskMessage.dumps(message)
 
         if message.eta and message.eta > datetime.now(UTC):
             # Use sorted set for delayed tasks
@@ -154,7 +154,7 @@ class RedisBroker(Broker):
                 for msg_id, fields in messages:
                     if fields and b"data" in fields:
                         data = fields[b"data"]
-                        message = TaskMessage.model_validate_json(data)
+                        message = TaskMessage.loads(data)
                         envelopes.append(
                             TaskEnvelope(
                                 message=message,
@@ -210,7 +210,7 @@ class RedisBroker(Broker):
                         for msg_id, fields in messages:
                             if fields and b"data" in fields:
                                 data = fields[b"data"]
-                                message = TaskMessage.model_validate_json(data)
+                                message = TaskMessage.loads(data)
 
                                 delivery_tag = (
                                     msg_id.decode()
@@ -273,7 +273,7 @@ class RedisBroker(Broker):
 
         # Build DLQ entry with metadata
         dlq_entry = {
-            "data": envelope.message.model_dump_json(),
+            "data": TaskMessage.dumps(envelope.message),
             "failed_at": datetime.now(UTC).isoformat(),
             "error": error or "",
             "retry_count": str(envelope.message.retries),
@@ -323,11 +323,9 @@ class RedisBroker(Broker):
 
             # Parse message data
             data = fields.get(b"data", b"{}")
-            if isinstance(data, bytes):
-                data = data.decode()
 
             try:
-                original_message = TaskMessage.model_validate_json(data)
+                original_message = TaskMessage.loads(data)
             except Exception:
                 continue  # Skip malformed messages
 
@@ -381,11 +379,9 @@ class RedisBroker(Broker):
 
         _, fields = messages[0]
         data = fields.get(b"data", b"{}")
-        if isinstance(data, bytes):
-            data = data.decode()
 
         try:
-            message = TaskMessage.model_validate_json(data)
+            message = TaskMessage.loads(data)
         except Exception:
             return False
 
@@ -408,7 +404,7 @@ class RedisBroker(Broker):
         # Publish back to main queue
         stream_key = self._stream_key(queue)
         publish_kwargs: dict[str, Any] = {
-            "fields": {"data": message.model_dump_json(), "task_id": message.id}
+            "fields": {"data": TaskMessage.dumps(message), "task_id": message.id}
         }
         if self.max_stream_length:
             publish_kwargs["maxlen"] = self.max_stream_length
