@@ -147,7 +147,7 @@ class RedisBackend(Backend):
         return active_workers
 
     async def cleanup_stale_clients(self, stale_seconds: float = 60.0) -> int:
-        # FIXME: actually use stale_seconds
+        # TODO @anvouk: https://github.com/chicory-dev/chicory/issues/28
         if not self._client:
             return 0
 
