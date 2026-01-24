@@ -28,8 +28,19 @@ class MockBackend:
         return self.workers if self.workers is not None else []
 
 
+class MockBroker:
+    def __init__(self):
+        pass
+
+
 class MockApp:
-    def __init__(self, backend: Any = None, config: ChicoryConfig | None = None):
+    def __init__(
+        self,
+        broker: Any = None,
+        backend: Any = None,
+        config: ChicoryConfig | None = None,
+    ):
+        self.broker = broker
         self.backend = backend
         self.config = config or ChicoryConfig()
 
@@ -250,9 +261,13 @@ class TestCleanup:
     def test_cleanup_command_execution(
         self, monkeypatch: pytest.MonkeyPatch, app_path: str
     ) -> None:
+        mock_broker_instance = MockBroker()
+        mock_broker_instance.cleanup_stale_clients = AsyncMock(return_value=3)  # ty:ignore[unresolved-attribute]
         mock_backend_instance = MockBackend()
-        mock_backend_instance.cleanup_stale_workers = AsyncMock(return_value=3)  # ty:ignore[unresolved-attribute]
-        mock_app_instance = MockApp(backend=mock_backend_instance)
+        mock_backend_instance.cleanup_stale_clients = AsyncMock(return_value=3)  # ty:ignore[unresolved-attribute]
+        mock_app_instance = MockApp(
+            broker=mock_broker_instance, backend=mock_backend_instance
+        )
 
         def mock_import_app(path: str) -> MockApp:
             return mock_app_instance
@@ -270,7 +285,7 @@ class TestCleanup:
             ],
         )
         assert result.exit_code == 0
-        assert "Removed 3 stale worker(s)." in result.output
+        assert "Removed 3 stale backend(s) and 3 stale broker(s)." in result.output
 
     def test_cleanup_command_execution_no_backend(
         self, monkeypatch: pytest.MonkeyPatch

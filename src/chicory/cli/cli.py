@@ -14,6 +14,7 @@ from typing import Literal
 import typer
 
 from chicory.app import Chicory
+from chicory.broker.base import DEFAULT_QUEUE
 from chicory.worker import Worker
 
 app = typer.Typer(help="Chicory task queue worker CLI.")
@@ -217,10 +218,16 @@ def cleanup(
 
         await chicory_app.connect()
         try:
-            removed_count = await chicory_app.backend.cleanup_stale_workers(
+            removed_backends = await chicory_app.backend.cleanup_stale_clients(
                 stale_seconds
             )
-            typer.echo(f"Removed {removed_count} stale worker(s).")
+            removed_brokers = await chicory_app.broker.cleanup_stale_clients(
+                DEFAULT_QUEUE, stale_seconds
+            )
+            typer.echo(
+                f"Removed {removed_backends} stale backend(s)"
+                f" and {removed_brokers} stale broker(s)."
+            )
         finally:
             await chicory_app.disconnect()
 

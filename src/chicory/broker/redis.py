@@ -525,6 +525,31 @@ class RedisBroker(Broker):
         except redis.ResponseError:
             return 0
 
+    async def cleanup_stale_clients(
+        self, queue: str = DEFAULT_QUEUE, stale_seconds: float = 60.0
+    ) -> int:
+        if not self._client:
+            return 0
+
+        consumers_info = await self._client.xinfo_consumers(
+            self._stream_key(queue), self.consumer_group
+        )
+
+        removed = 0
+        for consumer in consumers_info:
+            if consumer["pending"] > 0:
+                # Don't delete consumers with pending messages: wait for the autoclaim
+                # procedure to empty the queue before deleting the consumer.
+                continue
+
+            if consumer["idle"] / 1000 > stale_seconds:
+                await self._client.xgroup_delconsumer(
+                    self._stream_key(queue), self.consumer_group, consumer["name"]
+                )
+                removed += 1
+
+        return removed
+
     async def healthcheck(self) -> BrokerStatus:
         """Check the health of the broker connection."""
         if not self._client:

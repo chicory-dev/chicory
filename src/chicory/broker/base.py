@@ -141,6 +141,13 @@ class Broker(ABC):
         ...
 
     @abstractmethod
+    async def cleanup_stale_clients(
+        self, queue: str = DEFAULT_QUEUE, stale_seconds: float = 60.0
+    ) -> int:
+        """Clean up stale broker clients. Returns count of removed clients."""
+        ...
+
+    @abstractmethod
     async def healthcheck(self) -> BrokerStatus:
         """Check the health of the broker connection."""
         ...
