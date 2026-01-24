@@ -1,8 +1,77 @@
 from __future__ import annotations
 
-import pytest
+from dataclasses import dataclass
+from datetime import datetime
 
-from chicory.types import RetryBackoff, RetryPolicy, TaskOptions
+import pytest
+from pydantic import BaseModel
+
+from chicory.types import RetryBackoff, RetryPolicy, TaskMessage, TaskOptions
+
+
+class TestTaskMessageSerDes:
+    class MyPydanticModel(BaseModel):
+        foo: str
+        number: int
+        timestamp: datetime
+
+    def test_serdes_pydantic(self) -> None:
+        model = self.MyPydanticModel(foo="test", number=42, timestamp=datetime.now())
+        message = TaskMessage(
+            id="id",
+            name="test",
+            args=[model],
+            kwargs={},
+            retries=0,
+        )
+        validated_message = TaskMessage.loads(TaskMessage.dumps(message))
+        assert message.model_dump() == validated_message.model_dump()
+        assert model.model_dump() == validated_message.args[0].model_dump()
+
+    def test_serdes_dict(self) -> None:
+        model = {"foo": "test", "number": 42, "timestamp": datetime.now()}
+        message = TaskMessage(
+            id="id",
+            name="test",
+            args=[model],
+            kwargs={},
+            retries=0,
+        )
+        validated_message = TaskMessage.loads(TaskMessage.dumps(message))
+        assert message.model_dump() == validated_message.model_dump()
+        assert model == validated_message.args[0]
+
+    @dataclass
+    class MyDataclassModel:
+        foo: str
+        number: int
+        timestamp: datetime
+
+    def test_serdes_dataclass(self) -> None:
+        model = self.MyDataclassModel(foo="test", number=42, timestamp=datetime.now())
+        message = TaskMessage(
+            id="id",
+            name="test",
+            args=[model],
+            kwargs={},
+            retries=0,
+        )
+        validated_message = TaskMessage.loads(TaskMessage.dumps(message))
+        assert message.model_dump() == validated_message.model_dump()
+        assert model == validated_message.args[0]
+
+    def test_serdes_str(self):
+        model = "test-1234"
+        message = TaskMessage(
+            id="id",
+            name="test",
+            args=[model],
+            kwargs={},
+            retries=0,
+        )
+        validated_message = TaskMessage.loads(TaskMessage.dumps(message))
+        assert message.model_dump() == validated_message.model_dump()
+        assert model == validated_message.args[0]
 
 
 class TestRetryPolicy:
