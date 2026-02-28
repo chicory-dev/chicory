@@ -69,7 +69,12 @@ class TaskContext:
 
     @property
     def is_last_retry(self) -> bool:
-        """Check if this is the last retry attempt."""
+        """Check if this is the last retry attempt.
+
+        Returns:
+            ``True`` if the current attempt is the final one before the
+            task would exceed its maximum retry count.
+        """
         effective_max = (
             self.retry_policy.max_retries if self.retry_policy else self.max_retries
         )
@@ -77,7 +82,11 @@ class TaskContext:
 
     @property
     def remaining_retries(self) -> int:
-        """Get the number of remaining retry attempts."""
+        """Get the number of remaining retry attempts.
+
+        Returns:
+            The number of retries still available (``0`` when exhausted).
+        """
         effective_max = (
             self.retry_policy.max_retries if self.retry_policy else self.max_retries
         )

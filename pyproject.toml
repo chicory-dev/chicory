@@ -70,6 +70,11 @@ all = [
 
 [dependency-groups]
 dev = [
+    "mkdocs-material>=9.7.1",
+    "mkdocs-material-extensions>=1.3.1",
+    "mkdocstrings>=1.0.1",
+    "mkdocstrings-python>=2.0.1",
+    "pymdown-extensions>=10.20.1",
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
     "pytest-coverage>=0.0",

@@ -24,6 +24,34 @@ if TYPE_CHECKING:
 
 
 class Chicory:
+    """Main application class for creating and managing task queues.
+
+    The Chicory class is the central entry-point for the library. It manages
+    broker and backend connections, task registration, and global configuration.
+
+    Args:
+        broker: Message broker — either a ``BrokerType`` enum or a pre-built
+            ``Broker`` instance.
+        backend: Result backend — either a ``BackendType`` enum, a pre-built
+            ``Backend`` instance, or ``None`` for fire-and-forget mode.
+        config: Optional ``ChicoryConfig`` for fine-grained control over
+            broker, backend, and worker settings.
+        validation_mode: Default validation mode applied to every task
+            registered on this app. Can be overridden per-task.
+        delivery_mode: Default delivery mode applied to every task
+            registered on this app. Can be overridden per-task.
+
+    Example:
+        ```python
+        from chicory import Chicory, BrokerType, BackendType
+
+        app = Chicory(
+            broker=BrokerType.REDIS,
+            backend=BackendType.REDIS,
+        )
+        ```
+    """
+
     @overload
     def __init__(
         self,
@@ -120,10 +148,12 @@ class Chicory:
 
     @property
     def broker(self) -> Broker:
+        """The active message broker instance."""
         return self._broker
 
     @property
     def backend(self) -> Backend | None:
+        """The active result backend instance, or ``None`` if not configured."""
         return self._backend
 
     def task(
@@ -135,6 +165,21 @@ class Chicory:
         validation_mode: ValidationMode | None = None,
         delivery_mode: DeliveryMode | None = None,
     ) -> Callable[[Callable[P, R]], Task[P, R]]:
+        """Register a function as an async task.
+
+        Use this as a decorator to turn a regular (sync or async) function
+        into a dispatchable ``Task``.
+
+        Args:
+            name: Custom task name. Defaults to ``module.function_name``.
+            retry_policy: Retry configuration for failed executions.
+            ignore_result: If ``True``, results are not stored in the backend.
+            validation_mode: Override the app-level validation mode.
+            delivery_mode: Override the app-level delivery mode.
+
+        Returns:
+            A decorator that wraps the function as a ``Task``.
+        """
         options = TaskOptions(
             name=name,
             retry_policy=retry_policy,

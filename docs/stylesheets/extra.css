@@ -1,0 +1,50 @@
+/* Custom styling for Chicory documentation */
+
+:root {
+  --md-primary-fg-color: #673ab7;
+  --md-primary-fg-color--light: #9c64e1;
+  --md-primary-fg-color--dark: #512da8;
+  --md-accent-fg-color: #ab47bc;
+}
+
+/* Code block improvements */
+.highlight .filename {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  margin-bottom: -0.5rem;
+  background-color: var(--md-code-bg-color);
+  border-radius: 0.2rem 0.2rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--md-code-fg-color);
+}
+
+/* Improve admonition styling */
+.md-typeset .admonition {
+  border-radius: 0.4rem;
+}
+
+/* Better code font size */
+.md-typeset code {
+  font-size: 0.85em;
+}
+
+/* Improve table styling */
+.md-typeset table:not([class]) {
+  border-radius: 0.4rem;
+  font-size: 0.75rem;
+}
+
+/* Custom info boxes */
+.md-typeset .tip-box {
+  padding: 1rem;
+  margin: 1rem 0;
+  border-left: 4px solid var(--md-accent-fg-color);
+  background-color: var(--md-code-bg-color);
+  border-radius: 0 0.4rem 0.4rem 0;
+}
+
+/* Improve navigation */
+.md-tabs {
+  background-color: var(--md-primary-fg-color);
+}

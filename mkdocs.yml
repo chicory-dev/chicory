@@ -1,0 +1,174 @@
+site_name: Chicory
+site_description: Lightweight, async-native job queue for Python
+site_url: https://chicory-dev.github.io/chicory
+repo_name: chicory-dev/chicory
+repo_url: https://github.com/chicory-dev/chicory
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Roboto
+    code: Roboto Mono
+  features:
+    - announce.dismiss
+    - content.action.edit
+    - content.action.view
+    - content.code.annotate
+    - content.code.copy
+    - content.tooltips
+    - navigation.expand
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.instant.progress
+    - navigation.path
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/chicory-dev/chicory
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/chicory/
+  analytics:
+    feedback:
+      title: Was this page helpful?
+      ratings:
+        - icon: material/emoticon-happy-outline
+          name: This page was helpful
+          data: 1
+          note: >-
+            Thanks for your feedback!
+        - icon: material/emoticon-sad-outline
+          name: This page could be improved
+          data: 0
+          note: >-
+            Thanks for your feedback! Help us improve by
+            <a href="https://github.com/chicory-dev/chicory/issues/new" target="_blank" rel="noopener">opening an issue</a>.
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.snippets
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: chicory-dev
+      repo: chicory
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            members_order: source
+            show_root_heading: true
+            show_source: true
+            show_signature_annotations: true
+            separate_signature: true
+            merge_init_into_class: true
+            docstring_section_style: table
+            show_if_no_docstring: false
+            heading_level: 2
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - getting-started/index.md
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quick-start.md
+  - Tutorial:
+    - tutorial/index.md
+    - Basic Usage: tutorial/basic-usage.md
+    - Input Validation: tutorial/validation.md
+    - Retry Policies: tutorial/retry-policies.md
+    - Task Context: tutorial/task-context.md
+    - Delivery Modes: tutorial/delivery-modes.md
+  - User Guide:
+    - user-guide/index.md
+    - Workers: user-guide/workers.md
+    - Brokers:
+      - user-guide/brokers/index.md
+      - Redis: user-guide/brokers/redis.md
+      - RabbitMQ: user-guide/brokers/rabbitmq.md
+    - Backends:
+      - user-guide/backends/index.md
+    - Configuration: user-guide/configuration.md
+  - API Reference:
+    - api/index.md
+    - Chicory: api/chicory.md
+    - Task: api/task.md
+    - Worker: api/worker.md
+    - AsyncResult: api/async-result.md
+    - Types: api/types.md
+    - Exceptions: api/exceptions.md
+
+extra_css:
+  - stylesheets/extra.css

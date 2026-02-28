@@ -3,6 +3,8 @@ from __future__ import annotations
 from chicory.app import Chicory
 from chicory.config import (
     ChicoryConfig,
+    PostgresBackendConfig,
+    RabbitMQBrokerConfig,
     RedisBackendConfig,
     RedisBrokerConfig,
     WorkerConfig,
@@ -10,7 +12,9 @@ from chicory.config import (
 from chicory.context import TaskContext
 from chicory.exceptions import (
     BackendNotConfiguredError,
+    BrokerConnectionError,
     ChicoryError,
+    DbPoolExhaustedException,
     MaxRetriesExceededError,
     RetryError,
     TaskNotFoundError,
@@ -55,11 +59,15 @@ __all__ = [
     "RetryError",
     "MaxRetriesExceededError",
     "BackendNotConfiguredError",
+    "BrokerConnectionError",
+    "DbPoolExhaustedException",
     "Worker",
     "ChicoryConfig",
     "WorkerConfig",
     "RedisBackendConfig",
     "RedisBrokerConfig",
+    "RabbitMQBrokerConfig",
+    "PostgresBackendConfig",
 ]
 
 try:
