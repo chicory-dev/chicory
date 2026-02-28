@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import pickle
 import uuid
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -28,7 +29,7 @@ if TYPE_CHECKING:
 
 
 class DLQData(BaseModel):
-    data: str
+    data: bytes
     failed_at: str  # ISO timestamp
     error: str | None
     retry_count: int
@@ -36,6 +37,21 @@ class DLQData(BaseModel):
     task_name: str
     original_queue: str
     moved_by: str
+
+    @staticmethod
+    def dumps(message: DLQData) -> bytes:
+        return pickle.dumps(message)
+
+    @staticmethod
+    def loads(data: bytes, validate: bool = True) -> DLQData:
+        message = pickle.loads(data)  # type: ignore[arg-type]
+        if validate:
+            # Note: there seems to be no way to re-validate a pydantic model
+            # without having to recreate it. This because pydantic assumes a model
+            # cannot be 'corrupted' after creation.
+            return DLQData.model_validate(message)
+
+        return message
 
 
 class RabbitMQBroker(Broker):
@@ -343,7 +359,7 @@ class RabbitMQBroker(Broker):
     async def publish(self, message: TaskMessage, queue: str = DEFAULT_QUEUE) -> None:
         """Publish a task message to the specified queue."""
         async with self._acquire_channel() as channel:
-            data = message.model_dump_json().encode()
+            data = TaskMessage.dumps(message)
 
             # Handle delayed/scheduled tasks
             if message.eta and message.eta > datetime.now(UTC):
@@ -393,9 +409,7 @@ class RabbitMQBroker(Broker):
                             break
 
                         try:
-                            task_message = TaskMessage.model_validate_json(
-                                message.body.decode()
-                            )
+                            task_message = TaskMessage.loads(message.body)
 
                             envelope = TaskEnvelope(
                                 message=task_message,
@@ -494,7 +508,7 @@ class RabbitMQBroker(Broker):
             dlq = await self._declare_dlq(channel, queue)
 
             dlq_data = DLQData(
-                data=envelope.message.model_dump_json(),
+                data=TaskMessage.dumps(envelope.message),
                 failed_at=datetime.now(UTC).isoformat(),
                 error=error,
                 retry_count=envelope.message.retries,
@@ -506,7 +520,7 @@ class RabbitMQBroker(Broker):
 
             await channel.default_exchange.publish(
                 aio_pika.Message(
-                    body=dlq_data.model_dump_json().encode(),
+                    body=DLQData.dumps(dlq_data),
                     content_type="application/json",
                     delivery_mode=aio_pika.DeliveryMode.PERSISTENT
                     if self.durable_queues
@@ -554,19 +568,16 @@ class RabbitMQBroker(Broker):
                     break
 
                 try:
-                    body_str = message.body.decode()
                     try:
-                        dlq_data = DLQData.model_validate_json(body_str)
-                        original_message = TaskMessage.model_validate_json(
-                            dlq_data.data
-                        )
+                        dlq_data = DLQData.loads(message.body)
+                        original_message = TaskMessage.loads(dlq_data.data)
                         failed_at = dlq_data.failed_at
                         error = dlq_data.error
                         retry_count = dlq_data.retry_count
                         task_id = dlq_data.task_id
                     except Exception:
                         # Fallback for native DLX messages
-                        original_message = TaskMessage.model_validate_json(body_str)
+                        original_message = TaskMessage.loads(message.body)
                         failed_at = datetime.now(UTC).isoformat()
                         error = message.headers.get(
                             "x-first-death-reason", "Native DLX"
@@ -622,14 +633,13 @@ class RabbitMQBroker(Broker):
                     if not message:
                         break
 
-                    body_str = message.body.decode()
                     try:
-                        dlq_data = DLQData.model_validate_json(body_str)
+                        dlq_data = DLQData.loads(message.body)
                         current_task_id = dlq_data.task_id
                     except Exception:
                         # Fallback for native DLX messages
                         try:
-                            task_msg = TaskMessage.model_validate_json(body_str)
+                            task_msg = TaskMessage.loads(message.body)
                             current_task_id = task_msg.id
                         except Exception:
                             current_task_id = None
@@ -653,13 +663,12 @@ class RabbitMQBroker(Broker):
                 if not target_message:
                     return False
 
-                body_str = target_message.body.decode()
                 try:
-                    dlq_data = DLQData.model_validate_json(body_str)
-                    task_message = TaskMessage.model_validate_json(dlq_data.data)
+                    dlq_data = DLQData.loads(target_message.body)
+                    task_message = TaskMessage.loads(dlq_data.data)
                 except Exception:
                     # Fallback for native DLX messages
-                    task_message = TaskMessage.model_validate_json(body_str)
+                    task_message = TaskMessage.loads(target_message.body)
 
                 # Reset retry count if requested
                 if reset_retries:
@@ -714,14 +723,13 @@ class RabbitMQBroker(Broker):
                     if not message:
                         break
 
-                    body_str = message.body.decode()
                     try:
-                        dlq_data = DLQData.model_validate_json(body_str)
+                        dlq_data = DLQData.loads(message.body)
                         current_task_id = dlq_data.task_id
                     except Exception:
                         # Fallback for native DLX messages
                         try:
-                            task_msg = TaskMessage.model_validate_json(body_str)
+                            task_msg = TaskMessage.loads(message.body)
                             current_task_id = task_msg.id
                         except Exception:
                             current_task_id = None

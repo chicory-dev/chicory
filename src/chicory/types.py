@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pickle
 import random
 from datetime import UTC, datetime  # noqa: TC003
 from enum import StrEnum
@@ -151,6 +152,21 @@ class TaskMessage(BaseModel):
     last_error: str | None = Field(
         default=None, description="Last error message for debugging"
     )
+
+    @staticmethod
+    def dumps(message: TaskMessage) -> bytes:
+        return pickle.dumps(message)
+
+    @staticmethod
+    def loads(data: bytes, validate: bool = True) -> TaskMessage:
+        message = pickle.loads(data)  # type: ignore[arg-type]
+        if validate:
+            # Note: there seems to be no way to re-validate a pydantic model
+            # without having to recreate it. This because pydantic assumes a model
+            # cannot be 'corrupted' after creation.
+            return TaskMessage.model_validate(message)
+
+        return message
 
 
 class TaskResult(BaseModel, Generic[T]):  # noqa: UP046
