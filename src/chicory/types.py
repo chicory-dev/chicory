@@ -13,6 +13,8 @@ T = TypeVar("T")
 
 
 class TaskState(StrEnum):
+    """Possible states of a task during its lifecycle."""
+
     PENDING = "PENDING"
     STARTED = "STARTED"
     SUCCESS = "SUCCESS"
@@ -22,11 +24,15 @@ class TaskState(StrEnum):
 
 
 class DeliveryMode(StrEnum):
+    """Message delivery guarantee level."""
+
     AT_LEAST_ONCE = "at_least_once"
     AT_MOST_ONCE = "at_most_once"
 
 
 class ValidationMode(StrEnum):
+    """When and what to validate on task arguments and return values."""
+
     NONE = "none"
     INPUTS = "inputs"
     OUTPUTS = "outputs"
@@ -196,13 +202,21 @@ class BaseStatus(BaseModel):
     )
 
 
-class BrokerStatus(BaseStatus): ...
+class BrokerStatus(BaseStatus):
+    """Health-check result for a broker connection."""
+
+    ...
 
 
-class BackendStatus(BaseStatus): ...
+class BackendStatus(BaseStatus):
+    """Health-check result for a backend connection."""
+
+    ...
 
 
 class WorkerStats(BaseModel):
+    """Runtime statistics reported by a worker."""
+
     worker_id: str = Field(..., description="Unique worker identifier")
     hostname: str = Field(..., description="Hostname where worker is running")
     pid: int = Field(..., description="Process ID")
@@ -232,11 +246,15 @@ class WorkerStats(BaseModel):
 
 
 class BrokerType(StrEnum):
+    """Supported message broker implementations."""
+
     REDIS = "redis"
     RABBITMQ = "rabbitmq"
 
 
 class BackendType(StrEnum):
+    """Supported result backend implementations."""
+
     REDIS = "redis"
     MSSQL = "mssql"
     POSTGRES = "postgres"

@@ -363,7 +363,11 @@ class PostgresBackendConfig(BaseBackendConfig):
 
 
 class MySQLBackendConfig(BaseBackendConfig):
-    """MySQL result backend configuration."""
+    """MySQL result backend configuration.
+
+    Warning:
+        Experimental and not tested. Use at your own risk.
+    """
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -434,7 +438,11 @@ class MySQLBackendConfig(BaseBackendConfig):
 
 
 class MSSQLBackendConfig(BaseBackendConfig):
-    """MSSQL result backend configuration."""
+    """MSSQL result backend configuration.
+
+    Warning:
+        Experimental and not tested. Use at your own risk.
+    """
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -525,7 +533,11 @@ class MSSQLBackendConfig(BaseBackendConfig):
 
 
 class SQLiteBackendConfig(BaseBackendConfig):
-    """SQLite result backend configuration."""
+    """SQLite result backend configuration.
+
+    Warning:
+        Experimental and not tested. Use at your own risk.
+    """
 
     model_config = SettingsConfigDict(
         env_file=".env",

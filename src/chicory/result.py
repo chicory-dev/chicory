@@ -28,7 +28,23 @@ class AsyncResult(Generic[T]):  # noqa: UP046
     async def get(
         self, timeout: float | None = None, poll_interval: float = 0.1
     ) -> T | None:
-        """Wait for and return the task result."""
+        """Wait for and return the task result.
+
+        Polls the backend at regular intervals until the task reaches a
+        terminal state (``SUCCESS`` or ``FAILURE``).
+
+        Args:
+            timeout: Maximum seconds to wait. ``None`` means wait forever.
+            poll_interval: Seconds between backend polls (default ``0.1``).
+
+        Returns:
+            The task's return value, or ``None`` if the task returned nothing.
+
+        Raises:
+            TimeoutError: If *timeout* is reached before the task completes.
+            BackendNotConfiguredError: If no backend is attached.
+            Exception: Re-raised from the task if it ended in ``FAILURE``.
+        """
         backend = self._ensure_backend()
 
         elapsed = 0.0
@@ -53,7 +69,15 @@ class AsyncResult(Generic[T]):  # noqa: UP046
             elapsed += poll_interval
 
     async def state(self) -> TaskState:
-        """Get current task state."""
+        """Get the current task state.
+
+        Returns:
+            The current ``TaskState`` (e.g. ``PENDING``, ``STARTED``,
+            ``SUCCESS``, ``FAILURE``, ``RETRY``).
+
+        Raises:
+            BackendNotConfiguredError: If no backend is attached.
+        """
         backend = self._ensure_backend()
         result = await backend.get_result(self.task_id)
         if result:
@@ -61,11 +85,19 @@ class AsyncResult(Generic[T]):  # noqa: UP046
         return TaskState.PENDING
 
     async def ready(self) -> bool:
-        """Check if the task is complete (success or failure)."""
+        """Check if the task is complete (success or failure).
+
+        Returns:
+            ``True`` if the task reached ``SUCCESS`` or ``FAILURE``.
+        """
         state = await self.state()
         return state in {TaskState.SUCCESS, TaskState.FAILURE}
 
     async def failed(self) -> bool:
-        """Check if the task has failed."""
+        """Check if the task has failed.
+
+        Returns:
+            ``True`` if the task state is ``FAILURE``.
+        """
         state = await self.state()
         return state == TaskState.FAILURE

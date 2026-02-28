@@ -130,6 +130,23 @@ class Task(Generic[P, R]):  # noqa: UP046
             ) from e
 
     async def delay(self, *args: P.args, **kwargs: P.kwargs) -> AsyncResult[R]:
+        """Dispatch this task for asynchronous execution.
+
+        Publishes a message to the broker and returns an ``AsyncResult``
+        that can be used to poll or await the outcome.
+
+        Args:
+            *args: Positional arguments forwarded to the task function.
+            **kwargs: Keyword arguments forwarded to the task function.
+
+        Returns:
+            An ``AsyncResult`` instance for tracking the task's state and
+            retrieving its return value.
+
+        Raises:
+            ValidationError: If input validation is enabled and the
+                arguments fail validation.
+        """
         validation_mode = (
             self.options.validation_mode or self.app.config.validation_mode
         )
