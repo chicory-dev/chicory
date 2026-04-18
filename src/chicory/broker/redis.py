@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import redis.asyncio as redis
 
@@ -13,7 +13,7 @@ from chicory.types import BrokerStatus, DeliveryMode, TaskMessage
 from .base import DEFAULT_QUEUE, Broker, DLQMessage, TaskEnvelope
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
+    from collections.abc import AsyncGenerator, Awaitable
 
 
 class RedisBroker(Broker):
@@ -47,7 +47,7 @@ class RedisBroker(Broker):
             connection_pool=self._pool,
             decode_responses=False,  # Keep as bytes for consistency
         )
-        await self._client.ping()  # type: ignore[unused-awaitable]
+        await cast("Awaitable[bool]", self._client.ping())
 
     async def disconnect(self) -> None:
         self.stop()
@@ -552,7 +552,7 @@ class RedisBroker(Broker):
             return BrokerStatus(connected=False, error="Not connected")
 
         try:
-            await self._client.ping()  # type: ignore[unused-awaitable]
+            await cast("Awaitable[bool]", self._client.ping())
             return BrokerStatus(connected=True)
         except Exception as e:
             return BrokerStatus(connected=False, error=str(e))

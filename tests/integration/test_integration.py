@@ -95,7 +95,7 @@ async def test_retry_policies(chicory_worker: Worker, clean_queue: None) -> None
             raise ValueError("Fail once")
         return "Success"
 
-    result = await flaky.delay()
+    result = await flaky.delay()  # ty: ignore[missing-argument]
     value = await result.get(timeout=10)
     assert value == "Success"
 
@@ -379,14 +379,14 @@ async def test_context_advanced(chicory_worker: Worker, clean_queue: None) -> No
             ctx.retry(countdown=0.1)
         return ctx.retries
 
-    result = await manual_retry.delay()
+    result = await manual_retry.delay()  # ty: ignore[missing-argument]
     assert await result.get(timeout=10) == 2
 
     @app.task(name=f"test.manual_fail.{test_id}")
     async def manual_fail(ctx: TaskContext):
         ctx.fail(RuntimeError("Forced failure"))
 
-    result2 = await manual_fail.delay()
+    result2 = await manual_fail.delay()  # ty: ignore[missing-argument]
     with pytest.raises(Exception, match="Forced failure"):
         await result2.get(timeout=10)
 
@@ -407,7 +407,7 @@ async def test_validation_modes(chicory_app: Chicory) -> None:
 
     # Invalid
     with pytest.raises(ValidationError):
-        await validated.delay("not-int", 1)
+        await validated.delay("not-int", 1)  # ty: ignore[invalid-argument-type]
 
 
 @pytest.mark.integration
@@ -481,6 +481,7 @@ async def test_manual_dlq_move(chicory_app: Chicory, clean_queue: None) -> None:
     msgs = await chicory_app.broker.get_dlq_messages(count=10)
     found = next((m for m in msgs if m.original_message.id == msg.id), None)
     assert found is not None
+    assert found.error is not None
     assert "Manual error" in found.error
 
     # Cleanup: delete our message from DLQ
@@ -580,7 +581,7 @@ async def test_retry_backoffs(chicory_worker: Worker, clean_queue: None) -> None
                 raise ValueError("Fail")
             return "Success"
 
-        result = await flaky.delay()
+        result = await flaky.delay()  # ty: ignore[missing-argument]
         assert await result.get(timeout=10) == "Success"
 
 

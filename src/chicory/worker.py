@@ -218,39 +218,12 @@ class Worker:
         try:
             while self._running:
                 await asyncio.sleep(self.cleanup_interval)
-                removed_backends = await self.app.backend.cleanup_stale_clients(
-                    self.stale_workers_timeout
-                )
-                removed_brokers = await self.app.broker.cleanup_stale_clients(
-                    DEFAULT_QUEUE, self.stale_workers_timeout
-                )
-                self._logger.info(
-                    "Cleanup completed: removed stale backends: %s,"
-                    " removed stale brokers: %s",
-                    removed_backends,
-                    removed_brokers,
-                    extra={"worker_id": self.worker_id},
-                )
-        except asyncio.CancelledError:
-            self._logger.debug(
-                "Cleanup loop cancelled", extra={"worker_id": self.worker_id}
-            )
-        finally:
-            self._logger.info(
-                "Cleanup loop exited", extra={"worker_id": self.worker_id}
-            )
-
-    async def _cleanup_loop(self) -> None:
-        self._logger.info(
-            f"Starting cleanup loop (interval={self.cleanup_interval}s)",
-            extra={"worker_id": self.worker_id},
-        )
-
-        try:
-            while self._running:
-                await asyncio.sleep(self.cleanup_interval)
-                removed_backends = await self.app.backend.cleanup_stale_clients(
-                    self.stale_workers_timeout
+                removed_backends = (
+                    await self.app.backend.cleanup_stale_clients(
+                        self.stale_workers_timeout
+                    )
+                    if self.app.backend is not None
+                    else 0
                 )
                 removed_brokers = await self.app.broker.cleanup_stale_clients(
                     DEFAULT_QUEUE, self.stale_workers_timeout

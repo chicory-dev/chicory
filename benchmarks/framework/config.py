@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 
-class WorkloadType(str, Enum):
+class WorkloadType(StrEnum):
     INCREMENT = "increment"
     CPU_BOUND = "cpu_bound"
     IO_BOUND = "io_bound"
@@ -16,7 +16,7 @@ class WorkloadType(str, Enum):
     PRIORITY = "priority"
 
 
-class BenchmarkTarget(str, Enum):
+class BenchmarkTarget(StrEnum):
     CHICORY = "chicory"
     TASKIQ = "taskiq"
 

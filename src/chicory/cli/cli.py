@@ -90,7 +90,7 @@ def worker(
 
     typer.echo(f"Starting Chicory worker for {app_path}")
     typer.echo(f"Log Level: {log_level}")
-    typer.echo(f"Workers: {workers}")
+    typer.echo(f"Workers: {workers_count}")
     typer.echo(f"Concurrency: {concurrency}")
     typer.echo(f"Queue: {queue}")
     typer.echo(f"Heartbeat Interval: {heartbeat_interval}s")

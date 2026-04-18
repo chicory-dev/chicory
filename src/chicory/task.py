@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 import uuid
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Any, Generic, cast
 
 from pydantic import BaseModel, ConfigDict, create_model
 from pydantic import ValidationError as PydanticValidationError
@@ -65,10 +65,10 @@ class Task(Generic[P, R]):  # noqa: UP046
                 "Task %s defined in __main__ could not be resolved to an importable "
                 "module. Workers may not be able to execute this task. "
                 "Consider running via `python -m module` or setting task(name=...).",
-                self.fn.__name__,  # ty:ignore[possibly-missing-attribute]
+                cast("Any", self.fn).__name__,
             )
 
-        return f"{module}.{self.fn.__name__}"  # ty:ignore[possibly-missing-attribute]
+        return f"{module}.{cast('Any', self.fn).__name__}"
 
     def _is_context_param(self, param: inspect.Parameter) -> bool:
         """Check if a parameter is TaskContext type."""
@@ -105,7 +105,7 @@ class Task(Generic[P, R]):  # noqa: UP046
 
         return create_model(
             f"{self.name}Input",
-            **fields,  # type: ignore
+            **fields,
             __config__=ConfigDict(extra="forbid", arbitrary_types_allowed=True),
         )  # ty:ignore[no-matching-overload]
 
