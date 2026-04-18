@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: redis_exporter
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+
+  - job_name: chicory_benchmark
+    static_configs:
+      - targets: ["host.docker.internal:9090"]
+
+  - job_name: taskiq_benchmark
+    static_configs:
+      - targets: ["host.docker.internal:9091"]

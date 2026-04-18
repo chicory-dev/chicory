@@ -218,15 +218,19 @@ class Worker:
         try:
             while self._running:
                 await asyncio.sleep(self.cleanup_interval)
-                removed_backends = await self.app.backend.cleanup_stale_clients(
-                    self.stale_workers_timeout
+                removed_backends = (
+                    await self.app.backend.cleanup_stale_clients(
+                        self.stale_workers_timeout
+                    )
+                    if self.app.backend is not None
+                    else 0
                 )
                 removed_brokers = await self.app.broker.cleanup_stale_clients(
                     DEFAULT_QUEUE, self.stale_workers_timeout
                 )
                 self._logger.info(
-                    "Cleanup completed: removed stale backends: %s,"
-                    " removed stale brokers: %s",
+                    "Cleanup completed: removed stale backends: %s, removed stale "
+                    "brokers: %s",
                     removed_backends,
                     removed_brokers,
                     extra={"worker_id": self.worker_id},

@@ -110,7 +110,7 @@ class TestTaskValidateInputs:
         kwargs = {"y": "value"}
 
         try:
-            task._validate_inputs(*args, **kwargs)  # type: ignore
+            task._validate_inputs(*args, **kwargs)
             assert False, (
                 "Expected validation to fail due to missing required parameter"
             )
@@ -147,7 +147,7 @@ class TestTaskValidateInputs:
         kwargs = {"b": "extra"}
 
         with pytest.raises(ValidationError):
-            task._validate_inputs(*args, **kwargs)  # type: ignore
+            task._validate_inputs(*args, **kwargs)
 
 
 @pytest.mark.asyncio
