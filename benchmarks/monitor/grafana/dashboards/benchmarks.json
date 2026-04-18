@@ -1,0 +1,222 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Enqueue Duration (seconds)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "pointSize": 5, "showPoints": "always" }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "benchmark_enqueue_duration_seconds{target=~\"$target\", workload_type=~\"$workload_type\"}",
+          "legendFormat": "{{target}} / {{workload_type}} / {{batch_size}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Dequeue Duration (seconds)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "pointSize": 5, "showPoints": "always" }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "benchmark_dequeue_duration_seconds{target=~\"$target\", workload_type=~\"$workload_type\"}",
+          "legendFormat": "{{target}} / {{workload_type}} / {{batch_size}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Throughput (tasks/s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "pointSize": 5, "showPoints": "always" }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "benchmark_throughput_tasks_per_second{target=~\"$target\", workload_type=~\"$workload_type\"}",
+          "legendFormat": "{{target}} / {{workload_type}} / {{batch_size}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Successful Tasks",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "benchmark_task_success_total{target=~\"$target\", workload_type=~\"$workload_type\"}",
+          "legendFormat": "{{target}} / {{workload_type}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Failed Tasks",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "benchmark_task_failure_total{target=~\"$target\", workload_type=~\"$workload_type\"}",
+          "legendFormat": "{{target}} / {{workload_type}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Invalid Results",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }] } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "benchmark_task_invalid_total{target=~\"$target\", workload_type=~\"$workload_type\"}",
+          "legendFormat": "{{target}} / {{workload_type}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Redis Memory Usage",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "redis_memory_used_bytes",
+          "legendFormat": "used",
+          "refId": "A"
+        },
+        {
+          "expr": "redis_memory_max_bytes",
+          "legendFormat": "max",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Redis Ops/sec",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(redis_commands_processed_total[30s])",
+          "legendFormat": "commands/s",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Redis Connected Clients",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "redis_connected_clients",
+          "legendFormat": "clients",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["benchmark", "chicory", "taskiq"],
+  "templating": {
+    "list": [
+      {
+        "name": "target",
+        "type": "custom",
+        "current": { "text": "All", "value": "$__all" },
+        "options": [
+          { "text": "All", "value": "$__all", "selected": true },
+          { "text": "chicory", "value": "chicory", "selected": false },
+          { "text": "taskiq", "value": "taskiq", "selected": false }
+        ],
+        "includeAll": true,
+        "multi": true,
+        "query": "chicory,taskiq"
+      },
+      {
+        "name": "workload_type",
+        "type": "custom",
+        "current": { "text": "All", "value": "$__all" },
+        "options": [
+          { "text": "All", "value": "$__all", "selected": true },
+          { "text": "increment", "value": "increment", "selected": false },
+          { "text": "cpu_bound", "value": "cpu_bound", "selected": false },
+          { "text": "io_bound", "value": "io_bound", "selected": false }
+        ],
+        "includeAll": true,
+        "multi": true,
+        "query": "increment,cpu_bound,io_bound"
+      }
+    ]
+  },
+  "time": { "from": "now-30m", "to": "now" },
+  "title": "Chicory Benchmarks",
+  "uid": "chicory-benchmarks"
+}

@@ -1,76 +1,144 @@
 # Benchmarks
 
-## Run
+Apple-to-apple comparison of **Chicory** vs **TaskIQ**, both using Redis as broker and
+result backend.
 
-### Run `chicory`
+## Prerequisites
 
-```bash
-# terminal 1
-make chicory-worker
+- Docker & Docker Compose
+- Python 3.11+ with `uv`
 
-# terminal 2
-make chicory-run
-```
-
-### Run `taskiq`
+## Quick start
 
 ```bash
-# terminal 1
-make taskiq-worker
+# 1. Install benchmark deps
+uv sync --dev --all-extras
 
-# terminal 2
-make taskiq-run
+# 2. Start Redis, Prometheus, Grafana
+make up
+
+# 3. Terminal 1 — start a worker (pick one)
+make chicory-worker    # 4 processes × 32 concurrency = 128 concurrent
+make taskiq-worker     # 4 processes × 32 max-async-tasks = 128 concurrent
+
+# 4. Terminal 2 — run benchmark
+make chicory-run-all
+make taskiq-run-all
+
+# 5. View results
+#    Console — printed at end of run
+#    Grafana — http://localhost:3000 (dashboard: "Chicory Benchmarks")
+#    Prometheus — http://localhost:9100
 ```
 
-## Results
+## What's measured
 
-```
-Debian GNU/Linux 13 (trixie) x86_64
-6.12.57+deb13-amd64
+Each benchmark iterates over batch sizes
+`[8, 16, 32, 64, 128, 256, 1024, 2048, 4096, 8192, 16384]` and records:
 
-Intel Xeon E5-2699 v4 (44) @ 3.600GHz
-80348 MiB
-```
+| Metric                      | Description                                         |
+|-----------------------------|-----------------------------------------------------|
+| **Enqueue duration**        | Wall time to `gather()` all `delay()`/`kiq()` calls |
+| **Dequeue duration**        | Wall time to `gather()` all result retrievals       |
+| **Throughput**              | `batch_size / (enqueue + dequeue)`                  |
+| **Success/Failure/Invalid** | Per-batch result classification                     |
 
-### Chicory
+Redis is flushed (both db 0 and db 1) between batches to prevent data leakage.
 
-```
-2025-12-28 21:36:28,935 - bench_chicory - INFO - =============== TIMINGS ===============
-2025-12-28 21:36:28,935 - bench_chicory - INFO - tasks:      8, enqueue:    0.005s, dequeue:    0.105s
-2025-12-28 21:36:28,935 - bench_chicory - INFO - tasks:     16, enqueue:    0.010s, dequeue:    0.112s
-2025-12-28 21:36:28,935 - bench_chicory - INFO - tasks:     32, enqueue:    0.022s, dequeue:    0.119s
-2025-12-28 21:36:28,935 - bench_chicory - INFO - tasks:     64, enqueue:    0.038s, dequeue:    0.126s
-2025-12-28 21:36:28,935 - bench_chicory - INFO - tasks:    128, enqueue:    0.055s, dequeue:    0.238s
-2025-12-28 21:36:28,936 - bench_chicory - INFO - tasks:    256, enqueue:    0.092s, dequeue:    0.387s
-2025-12-28 21:36:28,936 - bench_chicory - INFO - tasks:   1024, enqueue:    0.291s, dequeue:    1.130s
-2025-12-28 21:36:28,936 - bench_chicory - INFO - tasks:   2048, enqueue:    0.544s, dequeue:    2.115s
-2025-12-28 21:36:28,936 - bench_chicory - INFO - tasks:   4096, enqueue:    0.887s, dequeue:    3.903s
-2025-12-28 21:36:28,936 - bench_chicory - INFO - tasks:   8192, enqueue:    1.984s, dequeue:    8.217s
-2025-12-28 21:36:28,936 - bench_chicory - INFO - tasks:  16384, enqueue:    3.789s, dequeue:   16.379s
-2025-12-28 21:36:28,936 - bench_chicory - INFO - =======================================
-```
+## Workload types
 
-> **Note**: Creates few connections to Redis even while inserting 16384 records, but
-> the commands per second are high and make Redis CPU skyrocket.
+| Workload    | Task body                                 | Purpose                                  |
+|-------------|-------------------------------------------|------------------------------------------|
+| `increment` | `return value + 1`                        | Baseline — pure enqueue/dequeue overhead |
+| `cpu_bound` | 10k iterations of `(x * 31 + 17) % 1e9+7` | CPU-bound worker load                    |
+| `io_bound`  | `asyncio.sleep(0.01)`                     | I/O-bound / concurrency pressure         |
 
-### TaskIQ
-
-```
-2025-12-28 21:35:15,333 - bench_taskiq - INFO - =============== TIMINGS ===============
-2025-12-28 21:35:15,333 - bench_taskiq - INFO - tasks:      8, enqueue:    0.041s, dequeue:    0.057s
-2025-12-28 21:35:15,333 - bench_taskiq - INFO - tasks:     16, enqueue:    0.027s, dequeue:    0.135s
-2025-12-28 21:35:15,333 - bench_taskiq - INFO - tasks:     32, enqueue:    0.044s, dequeue:    0.187s
-2025-12-28 21:35:15,333 - bench_taskiq - INFO - tasks:     64, enqueue:    0.085s, dequeue:    0.219s
-2025-12-28 21:35:15,333 - bench_taskiq - INFO - tasks:    128, enqueue:    0.165s, dequeue:    0.308s
-2025-12-28 21:35:15,333 - bench_taskiq - INFO - tasks:    256, enqueue:    0.307s, dequeue:    0.470s
-2025-12-28 21:35:15,333 - bench_taskiq - INFO - tasks:   1024, enqueue:    1.219s, dequeue:    1.436s
-2025-12-28 21:35:15,334 - bench_taskiq - INFO - tasks:   2048, enqueue:    2.259s, dequeue:    2.825s
-2025-12-28 21:35:15,334 - bench_taskiq - INFO - tasks:   4096, enqueue:    4.916s, dequeue:    5.944s
-2025-12-28 21:35:15,334 - bench_taskiq - INFO - tasks:   8192, enqueue:   10.951s, dequeue:   13.174s
-2025-12-28 21:35:15,334 - bench_taskiq - INFO - tasks:  16384, enqueue:   23.592s, dequeue:   36.781s
-2025-12-28 21:35:15,334 - bench_taskiq - INFO - =======================================
+```bash
+make chicory-run-increment   # or cpu, io, all
+make taskiq-run-all
 ```
 
-> **Note**: Creates one connection per result. e.g. inserting 128 tasks will result in 128
-> concurrent connections to Redis. While working with 16384 tasks, the connections count
-> doubled to 32768: needs investigation as to why.
+## Fairness controls
+
+Both frameworks run under equivalent conditions:
+
+| Setting                | Chicory               | TaskIQ                |
+|------------------------|-----------------------|-----------------------|
+| Workers (processes)    | 4                     | 4                     |
+| Concurrency per worker | 32                    | 32                    |
+| Broker                 | Redis streams (db 0)  | Redis streams (db 0)  |
+| Result backend         | Redis (db 1)          | Redis (db 1)          |
+| Validation overhead    | `ValidationMode.NONE` | N/A (none by default) |
+| Connection pool        | Default               | Default               |
+
+## Monitoring
+
+### Services (via `docker compose`)
+
+| Service        | Internal port | External port |
+|----------------|---------------|---------------|
+| Redis          | 6379          | 6379          |
+| Redis Exporter | 9121          | —             |
+| Prometheus     | 9090          | **9100**      |
+| Grafana        | 3000          | 3000          |
+
+Prometheus is on **9100** externally to avoid conflict with Chicory's metrics endpoint
+on 9090.
+
+### Prometheus targets
+
+| Job                 | Target                      | Notes                 |
+|---------------------|-----------------------------|-----------------------|
+| `redis_exporter`    | `redis-exporter:9121`       | Inside docker network |
+| `chicory_benchmark` | `host.docker.internal:9090` | Bench script on host  |
+| `taskiq_benchmark`  | `host.docker.internal:9091` | Bench script on host  |
+
+### Grafana dashboard
+
+Auto-provisioned at startup. Template variables:
+
+- **target**: `chicory`, `taskiq`, or both
+- **workload_type**: `increment`, `cpu_bound`, `io_bound`, or all
+
+9 panels: enqueue/dequeue duration, throughput, success/failure/invalid counts, Redis
+memory, Redis ops/sec, Redis connected clients.
+
+## Architecture
+
+```
+benchmarks/
+├── broker_redis/
+│   ├── bench_chicory.py      # Chicory benchmark script + task definitions
+│   └── bench_taskiq.py       # TaskIQ benchmark script + task definitions
+├── framework/
+│   ├── __init__.py
+│   ├── config.py             # BenchmarkConfig, WorkloadType enum
+│   ├── metrics.py            # MetricsCollector, BenchmarkResult, Prometheus gauges/counters
+│   ├── runner.py             # BenchmarkRunner (generic, for future use)
+│   └── workloads.py          # Task creator functions (for runner.py)
+├── monitor/
+│   ├── prometheus.yml
+│   └── grafana/
+│       ├── datasources.yml
+│       ├── dashboards.yml
+│       └── dashboards/
+│           └── benchmarks.json
+├── docker-compose.yml
+├── Makefile
+└── pyproject.toml            # uv workspace member
+```
+
+## Adding new benchmarks
+
+1. Create `broker_redis/bench_<name>.py` following the pattern in existing bench files
+2. Define tasks, `_WORKLOAD_TASKS` mapping, `_flush_redis()`, `_run_batch()`
+3. Use `MetricsCollector.record_result(result, "<name>")` for Prometheus export
+4. Add `make <name>-worker` and `make <name>-run-*` targets to `Makefile`
+5. Add a Prometheus scrape target in `monitor/prometheus.yml`
+6. Update the Grafana dashboard `target` template variable
+
+## Cleanup
+
+```bash
+make down          # Stop all containers, remove volumes
+```

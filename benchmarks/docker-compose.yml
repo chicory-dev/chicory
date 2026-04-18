@@ -1,0 +1,59 @@
+services:
+  redis:
+    image: redis:latest
+    command: ["redis-server", "--maxclients", "80000"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    networks:
+      - chicory
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.80.1-alpine
+    environment:
+      REDIS_ADDR: "redis://redis:6379"
+      REDIS_EXPORTER_EXPORT_CLIENT_LIST: "true"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - chicory
+
+  prometheus:
+    image: prom/prometheus:v3.9.1
+    ports:
+      - "9100:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - "./monitor/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+    depends_on:
+      - redis-exporter
+    networks:
+      - chicory
+
+  grafana:
+    image: grafana/grafana:main
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_LOG_LEVEL: "warning"
+      GF_PATHS_PROVISIONING: "/etc/grafana/provisioning"
+    ports:
+      - "3000:3000"
+    volumes:
+      - "./monitor/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro"
+      - "./monitor/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro"
+      - "./monitor/grafana/dashboards:/var/lib/grafana/dashboards:ro"
+    depends_on:
+      - prometheus
+    networks:
+      - chicory
+
+networks:
+  chicory:
