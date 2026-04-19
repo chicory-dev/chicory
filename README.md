@@ -1,10 +1,15 @@
-# Chicory
-
+<p align="center">
+  <img src="docs/assets/logo.svg" alt="Chicory" width="200">
+</p>
+<h1 align="center">Chicory</h1>
 <p align="center">
   <em>Lightweight, async-native job queue for Python</em>
 </p>
-
-[![Merge Gate - Full Tests](https://github.com/chicory-dev/chicory/actions/workflows/merge-gate.yml/badge.svg)](https://github.com/chicory-dev/chicory/actions/workflows/merge-gate.yml)
+<p align="center">
+  <a href="https://github.com/chicory-dev/chicory/actions/workflows/merge-gate.yml"><img alt="Build status" src="https://github.com/chicory-dev/chicory/actions/workflows/merge-gate.yml/badge.svg" /></a>
+  <a href="https://pypi.org/project/chicory"><img alt="PyPI - Version" src="https://img.shields.io/pypi/v/chicory"></a>
+  <img alt="PyPI - License" src="https://img.shields.io/pypi/l/chicory">
+</p>
 
 ---
 
