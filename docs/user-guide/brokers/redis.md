@@ -1,6 +1,7 @@
 # Redis Broker
 
-The Redis broker uses [Redis Streams](https://redis.io/docs/data-types/streams/) for task distribution. It's lightweight, easy to set up, and provides excellent performance for most use cases.
+The Redis broker uses [Redis Streams](https://redis.io/docs/data-types/streams/) for task distribution.
+It's lightweight, easy to set up, and provides excellent performance for most use cases.
 
 ## Installation
 
@@ -110,6 +111,35 @@ CHICORY_BROKER_REDIS_CONSUMER_GROUP=chicory-workers
 CHICORY_BROKER_REDIS_BLOCK_MS=5000
 CHICORY_BROKER_REDIS_CLAIM_MIN_IDLE_MS=30000
 ```
+
+### Delayed-Task Mover Settings
+
+These settings control the background loop that promotes delayed tasks from the sorted set
+to the main stream. See [Delayed Tasks / How It Works](#how-it-works-1) for details.
+
+```python
+config = RedisBrokerConfig(
+    # Minimum sleep between mover iterations (milliseconds).
+    # Used after a batch of tasks is promoted or as the lower
+    # bound when the next ETA is very close.
+    mover_min_sleep_ms=50,   # default 50 ms
+
+    # Maximum sleep between mover iterations (milliseconds).
+    # Used when the delayed set is empty or the next ETA is
+    # far in the future.
+    mover_max_sleep_ms=1000,  # default 1000 ms (1 second)
+)
+```
+
+**Environment variables:**
+```bash
+CHICORY_BROKER_REDIS_MOVER_MIN_SLEEP_MS=50
+CHICORY_BROKER_REDIS_MOVER_MAX_SLEEP_MS=1000
+```
+
+!!! tip "Tuning guidance"
+    - **Lower `mover_min_sleep_ms`** (e.g. 10) for sub-100ms ETA precision at the cost of slightly more Redis traffic.
+    - **Raise `mover_max_sleep_ms`** (e.g. 5000) to reduce idle polling when delayed tasks are infrequent.
 
 ### Stream Management
 
@@ -299,36 +329,49 @@ eta = datetime.now(UTC) + timedelta(hours=1)
 
 ### How It Works
 
-Delayed tasks use a Redis sorted set:
+Delayed tasks use a Redis sorted set with the ETA timestamp as the score and the
+pickle-serialized task bytes as the value:
 
 ```
 Sorted Set: chicory:delayed:default
-Score (timestamp) | Value (task JSON)
-1640433600.0      | {"id": "abc", "name": "task1", ...}
-1640437200.0      | {"id": "def", "name": "task2", ...}
+Score (timestamp) | Value (binary task data)
+1640433600.0      | <pickle bytes for task "abc">
+1640437200.0      | <pickle bytes for task "def">
 ```
 
-Workers periodically check for ready tasks:
+A **background mover loop** runs inside each worker and periodically promotes
+ready tasks to the main stream. Promotion is **atomic**: a server-side Lua
+script executes `ZRANGEBYSCORE`, `XADD`, and `ZREM` in a single `EVAL` call,
+so no two workers can promote the same task:
 
-```python
-# Every consumption cycle
-now = time.time()
-ready_tasks = ZRANGEBYSCORE chicory:delayed:default 0 {now}
-
-# Move to main stream
-for task in ready_tasks:
-    XADD chicory:stream:default {task}
-    ZREM chicory:delayed:default {task}
 ```
+EVAL lua_move_delayed 2 chicory:delayed:default chicory:stream:default <now>
+```
+
+The mover loop uses **adaptive polling** to balance responsiveness and
+efficiency:
+
+1. **Tasks just moved**: re-check quickly (`mover_min_sleep_ms`) in case
+   more messages are ready in a burst.
+2. **Delayed tasks pending**: sleep until the earliest one matures, clamped
+   to `[mover_min_sleep_ms, mover_max_sleep_ms]`.
+3. **No delayed tasks**: sleep for `mover_max_sleep_ms` to minimize idle
+   Redis traffic.
+
+All exceptions except `CancelledError` are caught, so transient Redis errors
+(pool exhaustion, network blips) cannot kill the loop; it logs the error and
+retries after `mover_max_sleep_ms`.
+
+See [Delayed-Task Mover Settings](#delayed-task-mover-settings) for tuning.
 
 ## Comparison with Celery
 
-| Feature | Chicory | Celery |
-|---------|---------|--------|
-| **Stream API** | XREADGROUP | Custom Lua |
-| **Consumer Groups** | Native | Custom |
-| **Delayed Tasks** | Sorted Set | Sorted Set |
-| **DLQ** | Stream-based | Custom |
+| Feature             | Chicory      | Celery     |
+|---------------------|--------------|------------|
+| **Stream API**      | XREADGROUP   | Custom Lua |
+| **Consumer Groups** | Native       | Custom     |
+| **Delayed Tasks**   | Sorted Set   | Sorted Set |
+| **DLQ**             | Stream-based | Custom     |
 
 Chicory uses native Redis Streams features for simpler, more maintainable code.
 

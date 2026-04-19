@@ -163,6 +163,7 @@ nav:
     - Backends:
       - user-guide/backends/index.md
     - Configuration: user-guide/configuration.md
+    - Benchmarks: user-guide/benchmarks.md
   - API Reference:
     - api/index.md
     - Chicory: api/chicory.md

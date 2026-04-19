@@ -1,6 +1,7 @@
 # Configuration
 
-Chicory provides a flexible configuration system using Pydantic Settings with support for environment variables, .env files, and programmatic configuration.
+Chicory provides a flexible configuration system using Pydantic Settings with support for
+environment variables, .env files, and programmatic configuration.
 
 ## Configuration Priority
 
@@ -173,6 +174,10 @@ config = RedisBrokerConfig(
     block_ms=5000,
     claim_min_idle_ms=30000,
 
+    # Delayed-task mover loop
+    mover_min_sleep_ms=50,    # Minimum polling interval (ms)
+    mover_max_sleep_ms=1000,  # Maximum polling interval (ms)
+
     # Stream management
     max_stream_length=100000,
     dlq_max_length=10000,
@@ -189,6 +194,8 @@ CHICORY_BROKER_REDIS_PASSWORD=secret
 CHICORY_BROKER_REDIS_CONSUMER_GROUP=chicory-workers
 CHICORY_BROKER_REDIS_BLOCK_MS=5000
 CHICORY_BROKER_REDIS_CLAIM_MIN_IDLE_MS=30000
+CHICORY_BROKER_REDIS_MOVER_MIN_SLEEP_MS=50
+CHICORY_BROKER_REDIS_MOVER_MAX_SLEEP_MS=1000
 CHICORY_BROKER_REDIS_MAX_STREAM_LENGTH=100000
 CHICORY_BROKER_REDIS_DLQ_MAX_LENGTH=10000
 CHICORY_BROKER_REDIS_KEY_PREFIX=chicory
@@ -325,7 +332,8 @@ CHICORY_BACKEND_POSTGRES_POOL_TIMEOUT=30
 ### Other Backends
 
 !!! warning "Experimental"
-    MySQL, SQLite, and MSSQL backends are **experimental and not tested**. They may work but are not guaranteed to be stable.
+    MySQL, SQLite, and MSSQL backends are **experimental and not tested**.
+    They may work but are not guaranteed to be stable.
 
 MySQL, SQLite, and MSSQL backends have similar configuration options to PostgreSQL.
 
