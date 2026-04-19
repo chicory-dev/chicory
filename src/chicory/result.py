@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import TYPE_CHECKING, Generic, cast
 
 from chicory.exceptions import BackendNotConfiguredError
@@ -47,7 +48,7 @@ class AsyncResult(Generic[T]):  # noqa: UP046
         """
         backend = self._ensure_backend()
 
-        elapsed = 0.0
+        deadline = time.monotonic() + timeout if timeout is not None else None
         while True:
             result = await backend.get_result(self.task_id)
 
@@ -60,13 +61,12 @@ class AsyncResult(Generic[T]):  # noqa: UP046
                     case _:
                         pass
 
-            if timeout is not None and elapsed >= timeout:
+            if deadline is not None and time.monotonic() >= deadline:
                 raise TimeoutError(
                     f"Task {self.task_id} did not complete in {timeout}s"
                 )
 
             await asyncio.sleep(poll_interval)
-            elapsed += poll_interval
 
     async def state(self) -> TaskState:
         """Get the current task state.

@@ -1,6 +1,7 @@
 # Message Brokers
 
-Message brokers are the backbone of Chicory's task distribution system. They queue task messages and deliver them to workers for execution.
+Message brokers are the backbone of Chicory's task distribution system.
+They queue task messages and deliver them to workers for execution.
 
 ## Overview
 
@@ -74,17 +75,17 @@ Chicory supports two production-ready message brokers:
 
 ## Feature Comparison
 
-| Feature | Redis Streams | RabbitMQ |
-|---------|--------------|----------|
-| **Setup Complexity** | Simple | Moderate |
-| **Priority Queues** | No | Yes |
-| **Message Routing** | Basic | Advanced |
-| **Dead Letter Queue** | Manual | Native |
-| **Delayed Tasks** | Sorted Set | TTL + DLX |
-| **Monitoring** | Redis CLI | Management UI |
-| **Clustering** | Redis Cluster | Native |
-| **Persistence** | RDB/AOF | Built-in |
-| **Memory Usage** | Low | Moderate |
+| Feature               | Redis Streams | RabbitMQ      |
+|-----------------------|---------------|---------------|
+| **Setup Complexity**  | Simple        | Moderate      |
+| **Priority Queues**   | No            | Yes           |
+| **Message Routing**   | Basic         | Advanced      |
+| **Dead Letter Queue** | Manual        | Native        |
+| **Delayed Tasks**     | Sorted Set    | TTL + DLX     |
+| **Monitoring**        | Redis CLI     | Management UI |
+| **Clustering**        | Redis Cluster | Native        |
+| **Persistence**       | RDB/AOF       | Built-in      |
+| **Memory Usage**      | Low           | Moderate      |
 
 ## Basic Usage
 
@@ -192,7 +193,7 @@ Both brokers support delayed task execution:
 from datetime import datetime, timedelta, UTC
 
 # Schedule for specific time
-eta = datetime(2024, 12, 25, 9, 0, 0)
+eta = datetime(2024, 12, 25, 9, 0, 0, tzinfo=UTC)
 message = TaskMessage(..., eta=eta)
 await app.broker.publish(message)
 

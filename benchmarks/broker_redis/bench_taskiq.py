@@ -71,7 +71,7 @@ async def _run_batch(
     workload_type: WorkloadType,
 ) -> BenchmarkResult:
     task_func = _WORKLOAD_TASKS[workload_type]
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     # startup per batch — FLUSHDB between batches destroys consumer groups
     await broker.startup()

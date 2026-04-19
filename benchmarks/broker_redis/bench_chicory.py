@@ -68,7 +68,7 @@ async def _run_batch(
     workload_type: WorkloadType,
 ) -> BenchmarkResult:
     task_func = _WORKLOAD_TASKS[workload_type]
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     logger.info("enqueuing tasks...")
     enqueue_start = loop.time()

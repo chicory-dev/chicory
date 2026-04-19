@@ -84,6 +84,17 @@ class RedisBrokerConfig(BaseBrokerConfig):
         description="Max DLQ size (None for unlimited)",
     )
 
+    mover_min_sleep_ms: float = Field(
+        default=50.0,
+        ge=0,
+        description="Minimum sleep time in ms for mover thread when not idle",
+    )
+    mover_max_sleep_ms: float = Field(
+        default=1000.0,
+        ge=50,
+        description="Maximum sleep time in ms for mover thread when idling",
+    )
+
     key_prefix: str = Field(
         default="chicory",
         description="Prefix for all Redis keys",

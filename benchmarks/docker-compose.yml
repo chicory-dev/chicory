@@ -23,6 +23,20 @@ services:
     networks:
       - chicory
 
+  redis-insight:
+    image: redis/redisinsight:latest
+    stop_grace_period: 0s
+    ports:
+      - 5540:5540
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - RI_REDIS_HOST=redis
+      - RI_REDIS_PORT=6379
+    networks:
+      - chicory
+
   prometheus:
     image: prom/prometheus:v3.9.1
     ports:
