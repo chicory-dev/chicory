@@ -50,6 +50,8 @@ theme:
     - search.share
     - search.suggest
     - toc.follow
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
   icon:
     repo: fontawesome/brands/github
     edit: material/pencil

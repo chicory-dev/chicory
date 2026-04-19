@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Center disc gradient -->
+    <radialGradient id="center-grad" cx="50%" cy="40%" r="95%">
+      <stop offset="0%" stop-color="#7E57C2"/>
+      <stop offset="100%" stop-color="#1A0A3E"/>
+    </radialGradient>
+
+    <!-- Front petal: sharp trident shape with 3 teeth (chicory-style) -->
+    <path id="front-petal" d="
+      M -6 -38
+      L -33 -116
+      L -32 -160
+      L -17 -144
+      L 0 -184
+      L 17 -144
+      L 32 -160
+      L 33 -116
+      L 6 -38
+      Z
+    "/>
+
+    <!-- Back petal: slightly shorter for layered depth -->
+    <path id="back-petal" d="
+      M -5 -34
+      L -32 -100
+      L -33 -138
+      L -14 -124
+      L 0 -160
+      L 14 -124
+      L 33 -138
+      L 32 -100
+      L 5 -34
+      Z
+    "/>
+  </defs>
+
+  <g transform="translate(256,256)">
+    <!-- ===== BACK PETALS (diagonals, darker) ===== -->
+    <use href="#back-petal" transform="rotate(45)"  fill="#4527A0"/>
+    <use href="#back-petal" transform="rotate(135)" fill="#4527A0"/>
+    <use href="#back-petal" transform="rotate(225)" fill="#4527A0"/>
+    <use href="#back-petal" transform="rotate(315)" fill="#4527A0"/>
+
+    <!-- ===== FRONT PETALS (cardinal directions, brighter) ===== -->
+    <use href="#front-petal"                         fill="#7C4DFF"/>
+    <use href="#front-petal" transform="rotate(90)"  fill="#7C4DFF"/>
+    <use href="#front-petal" transform="rotate(180)" fill="#7C4DFF"/>
+    <use href="#front-petal" transform="rotate(270)" fill="#7C4DFF"/>
+
+    <!-- ===== CENTER DISC ===== -->
+    <circle r="28" fill="#7E57C2" stroke="#12062E" stroke-width="0"/>
+  </g>
+</svg>
