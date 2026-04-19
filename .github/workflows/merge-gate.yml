@@ -38,7 +38,10 @@ jobs:
           --health-retries 20
 
       rabbitmq:
-        image: rabbitmq:3-management-alpine
+        image: rabbitmq:4-management-alpine
+        env:
+          RABBITMQ_ERLANG_COOKIE: ETRUG5XhX7VpYEEC2W2ps5ebnLvC4SMx
+          ERL_FLAGS: "-setcookie ETRUG5XhX7VpYEEC2W2ps5ebnLvC4SMx"
         ports:
           - 5672:5672
           - 15672:15672

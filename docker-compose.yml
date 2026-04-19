@@ -20,15 +20,17 @@ services:
       - RI_REDIS_PORT=6379
     ports:
       - 5540:5540
-      
+
   rabbitmq:
     image: rabbitmq:4.2-management
+    environment:
+      RABBITMQ_ERLANG_COOKIE: ETRUG5XhX7VpYEEC2W2ps5ebnLvC4SMx
+      ERL_FLAGS: "-setcookie ETRUG5XhX7VpYEEC2W2ps5ebnLvC4SMx"
     ports:
       - 5672:5672
       - 15672:15672
     volumes:
-      - rabbitmq-lib:/var/lib/rabbitmq/
-      - rabbitmq-log:/var/log/rabbitmq/
+      - rabbitmq-lib:/var/lib/rabbitmq/mnesia
     healthcheck:
       test: rabbitmq-diagnostics check_port_connectivity
       interval: 1s
@@ -64,8 +66,6 @@ services:
       retries: 20
 
 volumes:
-  rabbitmq-log:
-    driver: local
   rabbitmq-lib:
     driver: local
   postgres_data:
