@@ -54,7 +54,7 @@ class BenchmarkRunner:
         enqueue_func: Any,
         result_func: Any,
     ) -> BenchmarkResult:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         logger.info(f"Running workload {workload_type.value} with {task_count} tasks")
 

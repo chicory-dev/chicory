@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import logging
 import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
@@ -14,6 +16,26 @@ from .base import DEFAULT_QUEUE, Broker, DLQMessage, TaskEnvelope
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable
+
+_logger = logging.getLogger("chicory.broker.redis")
+
+# Lua script: atomically move delayed tasks whose score <= now from the
+# sorted set (KEYS[1]) to the stream (KEYS[2]).  Returns the number of
+# tasks moved.  Because the ZRANGEBYSCORE + ZREM happen inside a single
+# EVAL, no two workers can promote the same task.
+_LUA_MOVE_DELAYED = """
+local delayed_key = KEYS[1]
+local stream_key  = KEYS[2]
+local now         = ARGV[1]
+local ready = redis.call('ZRANGEBYSCORE', delayed_key, 0, now)
+local moved = 0
+for _, data in ipairs(ready) do
+    redis.call('XADD', stream_key, '*', 'data', data)
+    redis.call('ZREM', delayed_key, data)
+    moved = moved + 1
+end
+return moved
+"""
 
 
 class RedisBroker(Broker):
@@ -111,24 +133,88 @@ class RedisBroker(Broker):
 
         await self._client.xadd(stream_key, **kwargs)
 
-    async def _move_ready_delayed(self, queue: str) -> None:
-        """Move delayed tasks that are ready to the stream."""
+    async def _move_ready_delayed(self, queue: str) -> int:
+        """Atomically move delayed tasks that are ready to the stream.
+
+        Uses a Lua script so that the read-from-sorted-set and write-to-stream
+        happen in a single Redis operation.  This prevents multiple workers from
+        promoting the same task concurrently (the PERF-1 race condition).
+
+        Returns:
+            The number of tasks that were moved.
+        """
         if not self._client:
-            return
+            return 0
 
         now = datetime.now(UTC).timestamp()
         delayed_key = self._delayed_key(queue)
         stream_key = self._stream_key(queue)
 
-        # Get all tasks with score <= now
-        ready = await self._client.zrangebyscore(delayed_key, 0, now)
+        moved: int = await self._client.eval(  # ty: ignore[invalid-await]
+            _LUA_MOVE_DELAYED, 2, delayed_key, stream_key, now
+        )
+        return moved
 
-        if ready:
-            pipe = self._client.pipeline()
-            for task_data in ready:
-                pipe.xadd(stream_key, {"data": task_data})
-                pipe.zrem(delayed_key, task_data)
-            await pipe.execute()
+    async def _next_delayed_score(self, queue: str) -> float | None:
+        """Return the ETA timestamp of the earliest delayed task, or None."""
+        if not self._client:
+            return None
+        items = await self._client.zrange(
+            self._delayed_key(queue), 0, 0, withscores=True,
+        )
+        if items:
+            _member, score = items[0]
+            return float(score)
+        return None
+
+    _MOVER_MIN_SLEEP: float = 0.05   # 50 ms — fastest we ever poll
+    _MOVER_MAX_SLEEP: float = 1.0    # 1 s  — idle cadence
+
+    async def _delayed_mover_loop(self, queue: str) -> None:
+        """Background loop: promote ready delayed tasks to the stream.
+
+        The loop adapts its polling interval based on the next known ETA:
+
+        * **Tasks just moved** — re-check quickly (50 ms) in case more are
+          ready in a burst.
+        * **Delayed tasks pending** — sleep until the earliest one matures
+          (clamped to [50 ms, 1 s]).
+        * **No delayed tasks** — sleep for 1 s to minimise idle Redis traffic.
+
+        All exceptions except ``CancelledError`` are caught so transient Redis
+        errors (pool exhaustion, network blips) cannot kill the loop.
+        """
+        try:
+            while self._running:
+                try:
+                    moved = await self._move_ready_delayed(queue)
+                    if moved:
+                        # More may be ready right behind; re-check fast.
+                        await asyncio.sleep(self._MOVER_MIN_SLEEP)
+                        continue
+
+                    # Peek at the next delayed task to decide how long to
+                    # sleep.
+                    score = await self._next_delayed_score(queue)
+                    if score is not None:
+                        wait = score - datetime.now(UTC).timestamp()
+                        wait = max(self._MOVER_MIN_SLEEP, wait)
+                        wait = min(self._MOVER_MAX_SLEEP, wait)
+                    else:
+                        wait = self._MOVER_MAX_SLEEP
+
+                    await asyncio.sleep(wait)
+
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    _logger.exception(
+                        "delayed-mover iteration failed, will retry"
+                    )
+                    await asyncio.sleep(self._MOVER_MAX_SLEEP)
+        except asyncio.CancelledError:
+            pass
+
 
     async def _claim_stale_messages(self, queue: str) -> list[TaskEnvelope]:
         """Claim messages that have been pending too long (dead consumer recovery)."""
@@ -179,56 +265,61 @@ class RedisBroker(Broker):
         stream_key = self._stream_key(queue)
         last_claim_check = 0.0
 
-        while self._running:
-            # Periodically move ready delayed tasks
-            await self._move_ready_delayed(queue)
+        # Run delayed-task promotion in the background so short-countdown retries
+        # are moved to the stream every ~100 ms, independently of block_ms.
+        delayed_mover = asyncio.create_task(self._delayed_mover_loop(queue))
+        try:
+            while self._running:
+                # Periodically check for stale messages to reclaim (at-least-once)
+                now = asyncio.get_running_loop().time()
+                if (
+                    self.delivery_mode == DeliveryMode.AT_LEAST_ONCE
+                    and now - last_claim_check > 10
+                ):
+                    stale = await self._claim_stale_messages(queue)
+                    for envelope in stale:
+                        yield envelope
+                    last_claim_check = now
 
-            # Periodically check for stale messages to reclaim (at-least-once)
-            now = asyncio.get_event_loop().time()
-            if (
-                self.delivery_mode == DeliveryMode.AT_LEAST_ONCE
-                and now - last_claim_check > 10
-            ):
-                stale = await self._claim_stale_messages(queue)
-                for envelope in stale:
-                    yield envelope
-                last_claim_check = now
+                try:
+                    # XREADGROUP: read new messages for this consumer.
+                    # Use ">" to read only messages not yet delivered to any consumer.
+                    result = await self._client.xreadgroup(
+                        groupname=self.consumer_group,
+                        consumername=self.consumer_name,
+                        streams={stream_key: ">"},
+                        count=1,
+                        block=self.block_ms,
+                    )
 
-            try:
-                # XREADGROUP: read new messages for this consumer
-                # Use ">" to read only new messages not yet delivered to any consumer
-                result = await self._client.xreadgroup(
-                    groupname=self.consumer_group,
-                    consumername=self.consumer_name,
-                    streams={stream_key: ">"},
-                    count=1,
-                    block=self.block_ms,
-                )
+                    if result:
+                        for stream_name, messages in result:
+                            for msg_id, fields in messages:
+                                if fields and b"data" in fields:
+                                    data = fields[b"data"]
+                                    message = TaskMessage.loads(data)
 
-                if result:
-                    for stream_name, messages in result:
-                        for msg_id, fields in messages:
-                            if fields and b"data" in fields:
-                                data = fields[b"data"]
-                                message = TaskMessage.loads(data)
+                                    delivery_tag = (
+                                        msg_id.decode()
+                                        if isinstance(msg_id, bytes)
+                                        else msg_id
+                                    )
 
-                                delivery_tag = (
-                                    msg_id.decode()
-                                    if isinstance(msg_id, bytes)
-                                    else msg_id
-                                )
+                                    yield TaskEnvelope(
+                                        message=message,
+                                        delivery_tag=delivery_tag,
+                                        raw_data=data,
+                                    )
 
-                                yield TaskEnvelope(
-                                    message=message,
-                                    delivery_tag=delivery_tag,
-                                    raw_data=data,
-                                )
-
-            except redis.ResponseError as e:
-                if "NOGROUP" in str(e):
-                    await self._ensure_consumer_group(queue)
-                else:
-                    raise
+                except redis.ResponseError as e:
+                    if "NOGROUP" in str(e):
+                        await self._ensure_consumer_group(queue)
+                    else:
+                        raise
+        finally:
+            delayed_mover.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await delayed_mover
 
     async def ack(self, envelope: TaskEnvelope, queue: str = DEFAULT_QUEUE) -> None:
         """Acknowledge successful processing (only meaningful for at-least-once)."""
@@ -527,9 +618,13 @@ class RedisBroker(Broker):
         if not self._client:
             return 0
 
-        consumers_info = await self._client.xinfo_consumers(
-            self._stream_key(queue), self.consumer_group
-        )
+        try:
+            consumers_info = await self._client.xinfo_consumers(
+                self._stream_key(queue), self.consumer_group
+            )
+        except redis.ResponseError:
+            # Consumer group may not exist yet
+            return 0
 
         removed = 0
         for consumer in consumers_info:

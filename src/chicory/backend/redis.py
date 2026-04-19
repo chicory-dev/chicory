@@ -132,17 +132,23 @@ class RedisBackend(Backend):
 
         worker_ids: set[bytes] = await self._client.smembers(self._workers_set_key())  # ty:ignore[invalid-await]
 
-        active_workers = []
-        for worker_id_bytes in worker_ids:
-            worker_id = (
-                worker_id_bytes.decode()
-                if isinstance(worker_id_bytes, bytes)
-                else worker_id_bytes
-            )
+        # Use pipeline to batch all heartbeat lookups (avoid N+1 queries)
+        decoded_ids = [
+            wid.decode() if isinstance(wid, bytes) else wid for wid in worker_ids
+        ]
 
-            heartbeat = await self.get_heartbeat(worker_id)
-            if heartbeat:
-                active_workers.append(heartbeat)
+        if not decoded_ids:
+            return []
+
+        async with self._client.pipeline(transaction=False) as pipe:
+            for worker_id in decoded_ids:
+                pipe.get(self._heartbeat_key(worker_id))
+            results = await pipe.execute()
+
+        active_workers = []
+        for data in results:
+            if data:
+                active_workers.append(WorkerStats.model_validate_json(data))
 
         return active_workers
 

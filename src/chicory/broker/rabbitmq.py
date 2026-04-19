@@ -260,7 +260,7 @@ class RabbitMQBroker(Broker):
         if not message.eta:
             return
 
-        delay_seconds = (message.eta - datetime.now(UTC)).total_seconds()
+        delay_seconds = max(0, (message.eta - datetime.now(UTC)).total_seconds())
 
         await self._declare_delayed_infrastructure(channel, queue)
 
@@ -268,7 +268,7 @@ class RabbitMQBroker(Broker):
         await channel.default_exchange.publish(
             aio_pika.Message(
                 body=data,
-                content_type="application/json",
+                content_type="application/octet-stream",
                 delivery_mode=aio_pika.DeliveryMode.PERSISTENT
                 if self.durable_queues
                 else aio_pika.DeliveryMode.NOT_PERSISTENT,
@@ -373,7 +373,7 @@ class RabbitMQBroker(Broker):
             await channel.default_exchange.publish(
                 aio_pika.Message(
                     body=data,
-                    content_type="application/json",
+                    content_type="application/octet-stream",
                     delivery_mode=aio_pika.DeliveryMode.PERSISTENT
                     if self.durable_queues
                     else aio_pika.DeliveryMode.NOT_PERSISTENT,
@@ -447,23 +447,21 @@ class RabbitMQBroker(Broker):
 
     async def ack(self, envelope: TaskEnvelope, queue: str = DEFAULT_QUEUE) -> None:
         """Acknowledge successful processing of a message."""
-        if self.delivery_mode == DeliveryMode.AT_LEAST_ONCE:
-            raw_message = envelope._raw_message
-            if not isinstance(raw_message, AbstractIncomingMessage):
-                raise RuntimeError("Invalid raw message for acknowledgment")
-            if raw_message and not raw_message.processed:
-                await raw_message.ack()
+        raw_message = envelope._raw_message
+        if not isinstance(raw_message, AbstractIncomingMessage):
+            raise RuntimeError("Invalid raw message for acknowledgment")
+        if not raw_message.processed:
+            await raw_message.ack()
 
     async def nack(
         self, envelope: TaskEnvelope, requeue: bool = True, queue: str = DEFAULT_QUEUE
     ) -> None:
         """Negatively acknowledge a message, optionally requeuing it."""
-        if self.delivery_mode == DeliveryMode.AT_LEAST_ONCE:
-            raw_message = envelope._raw_message
-            if not isinstance(raw_message, AbstractIncomingMessage):
-                raise RuntimeError("Invalid raw message for negative acknowledgment")
-            if raw_message and not raw_message.processed:
-                await raw_message.nack(requeue=requeue)
+        raw_message = envelope._raw_message
+        if not isinstance(raw_message, AbstractIncomingMessage):
+            raise RuntimeError("Invalid raw message for negative acknowledgment")
+        if not raw_message.processed:
+            await raw_message.nack(requeue=requeue)
 
     def stop(self) -> None:
         """Stop consuming messages."""
@@ -521,7 +519,7 @@ class RabbitMQBroker(Broker):
             await channel.default_exchange.publish(
                 aio_pika.Message(
                     body=DLQData.dumps(dlq_data),
-                    content_type="application/json",
+                    content_type="application/octet-stream",
                     delivery_mode=aio_pika.DeliveryMode.PERSISTENT
                     if self.durable_queues
                     else aio_pika.DeliveryMode.NOT_PERSISTENT,

@@ -152,6 +152,12 @@ class Worker:
             with contextlib.suppress(asyncio.CancelledError):
                 await self._heartbeat_task
 
+        # Stop cleanup loop
+        if self._cleanup_task:
+            self._cleanup_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._cleanup_task
+
         # Wait for consume loop to finish
         if self._consume_task:
             try:
@@ -191,7 +197,7 @@ class Worker:
         """
         Periodic heartbeat sender.
         """
-        self._logger.info(
+        self._logger.debug(
             f"Starting heartbeat loop (interval={self.heartbeat_interval}s)",
             extra={"worker_id": self.worker_id},
         )
@@ -205,12 +211,12 @@ class Worker:
                 "Heartbeat loop cancelled", extra={"worker_id": self.worker_id}
             )
         finally:
-            self._logger.info(
+            self._logger.debug(
                 "Heartbeat loop exited", extra={"worker_id": self.worker_id}
             )
 
     async def _cleanup_loop(self) -> None:
-        self._logger.info(
+        self._logger.debug(
             f"Starting cleanup loop (interval={self.cleanup_interval}s)",
             extra={"worker_id": self.worker_id},
         )
@@ -218,29 +224,35 @@ class Worker:
         try:
             while self._running:
                 await asyncio.sleep(self.cleanup_interval)
-                removed_backends = (
-                    await self.app.backend.cleanup_stale_clients(
-                        self.stale_workers_timeout
+                try:
+                    removed_backends = (
+                        await self.app.backend.cleanup_stale_clients(
+                            self.stale_workers_timeout
+                        )
+                        if self.app.backend is not None
+                        else 0
                     )
-                    if self.app.backend is not None
-                    else 0
-                )
-                removed_brokers = await self.app.broker.cleanup_stale_clients(
-                    DEFAULT_QUEUE, self.stale_workers_timeout
-                )
-                self._logger.info(
-                    "Cleanup completed: removed stale backends: %s, removed stale "
-                    "brokers: %s",
-                    removed_backends,
-                    removed_brokers,
-                    extra={"worker_id": self.worker_id},
-                )
+                    removed_brokers = await self.app.broker.cleanup_stale_clients(
+                        DEFAULT_QUEUE, self.stale_workers_timeout
+                    )
+                    self._logger.info(
+                        "Cleanup completed: removed stale backends: %s, removed stale "
+                        "brokers: %s",
+                        removed_backends,
+                        removed_brokers,
+                        extra={"worker_id": self.worker_id},
+                    )
+                except Exception:
+                    self._logger.exception(
+                        "Cleanup iteration failed, will retry next interval",
+                        extra={"worker_id": self.worker_id},
+                    )
         except asyncio.CancelledError:
             self._logger.debug(
                 "Cleanup loop cancelled", extra={"worker_id": self.worker_id}
             )
         finally:
-            self._logger.info(
+            self._logger.debug(
                 "Cleanup loop exited", extra={"worker_id": self.worker_id}
             )
 
@@ -284,7 +296,7 @@ class Worker:
             >>> await worker.run()  # Blocks
         """
         # Set up signal handlers (not supported on Windows with ProactorEventLoop)
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         signals_registered = False
         try:
             for sig in (signal.SIGINT, signal.SIGTERM):
@@ -310,8 +322,8 @@ class Worker:
             self._logger.info(
                 "Keyboard interrupt received", extra={"worker_id": self.worker_id}
             )
-            await self.stop()
         finally:
+            await self.stop()
             # Clean up signal handlers if they were registered
             if signals_registered:
                 for sig in (signal.SIGINT, signal.SIGTERM):
@@ -323,14 +335,26 @@ class Worker:
             "Shutdown signal received", extra={"worker_id": self.worker_id}
         )
         if self._running:
-            asyncio.create_task(self.stop())
+            task = asyncio.create_task(self.stop())
+            task.add_done_callback(self._on_stop_done)
+
+    def _on_stop_done(self, task: asyncio.Task[None]) -> None:
+        """Log any exception raised by the graceful-shutdown task."""
+        if not task.cancelled() and (exc := task.exception()):
+            self._logger.error(
+                "Error during graceful shutdown",
+                exc_info=exc,
+                extra={"worker_id": self.worker_id},
+            )
 
     async def _shutdown(self) -> None:
         """Internal cleanup."""
         self._logger.info(
             "Shutting down worker...", extra={"worker_id": self.worker_id}
         )
-        self._executor.shutdown(wait=True)
+        await asyncio.get_running_loop().run_in_executor(
+            None, self._executor.shutdown, True
+        )
         await self.app.disconnect()
         self._logger.info(
             "Worker shutdown complete", extra={"worker_id": self.worker_id}
@@ -469,7 +493,7 @@ class Worker:
         if task.is_async:
             result = await task.fn(*args, **kwargs)
         else:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(
                 self._executor, functools.partial(task.fn, *args, **kwargs)
             )
