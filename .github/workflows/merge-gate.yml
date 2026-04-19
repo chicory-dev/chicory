@@ -38,7 +38,15 @@ jobs:
           --health-retries 20
 
       rabbitmq:
-        image: rabbitmq:3-management-alpine
+        image: rabbitmq:4-management-alpine
+        entrypoint:
+          - /bin/sh
+          - -c
+          - |-
+            echo ETRUG5XhX7VpYEEC2W2ps5ebnLvC4SMx > /var/lib/rabbitmq/.erlang.cookie
+            chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie
+            chmod 0400 /var/lib/rabbitmq/.erlang.cookie
+            exec docker-entrypoint.sh rabbitmq-server
         ports:
           - 5672:5672
           - 15672:15672

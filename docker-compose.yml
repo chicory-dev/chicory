@@ -20,15 +20,22 @@ services:
       - RI_REDIS_PORT=6379
     ports:
       - 5540:5540
-      
+
   rabbitmq:
     image: rabbitmq:4.2-management
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |-
+        echo ETRUG5XhX7VpYEEC2W2ps5ebnLvC4SMx > /var/lib/rabbitmq/.erlang.cookie
+        chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie
+        chmod 0400 /var/lib/rabbitmq/.erlang.cookie
+        exec docker-entrypoint.sh rabbitmq-server
     ports:
       - 5672:5672
       - 15672:15672
     volumes:
-      - rabbitmq-lib:/var/lib/rabbitmq/
-      - rabbitmq-log:/var/log/rabbitmq/
+      - rabbitmq-lib:/var/lib/rabbitmq/mnesia
     healthcheck:
       test: rabbitmq-diagnostics check_port_connectivity
       interval: 1s
@@ -64,8 +71,6 @@ services:
       retries: 20
 
 volumes:
-  rabbitmq-log:
-    driver: local
   rabbitmq-lib:
     driver: local
   postgres_data:
