@@ -134,9 +134,6 @@ class Worker:
                     If None, uses config.shutdown_timeout
         """
         if not self._running:
-            self._logger.warning(
-                "Worker is not running", extra={"worker_id": self.worker_id}
-            )
             return
 
         if timeout is None:

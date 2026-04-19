@@ -20,13 +20,13 @@ if TYPE_CHECKING:
 _logger = logging.getLogger("chicory.broker.redis")
 
 # Lua script: atomically move delayed tasks whose score <= now from the
-# sorted set (KEYS[1]) to the stream (KEYS[2]).  Returns the number of
-# tasks moved.  Because the ZRANGEBYSCORE + ZREM happen inside a single
+# sorted set (KEYS[1]) to the stream (KEYS[2]). Returns the number of
+# tasks moved. Because the ZRANGEBYSCORE + ZREM happens inside a single
 # EVAL, no two workers can promote the same task.
 _LUA_MOVE_DELAYED = """
 local delayed_key = KEYS[1]
-local stream_key  = KEYS[2]
-local now         = ARGV[1]
+local stream_key = KEYS[2]
+local now = ARGV[1]
 local ready = redis.call('ZRANGEBYSCORE', delayed_key, 0, now)
 local moved = 0
 for _, data in ipairs(ready) do
@@ -55,6 +55,9 @@ class RedisBroker(Broker):
         self.claim_min_idle_ms = config.claim_min_idle_ms
         self.max_stream_length = config.max_stream_length
         self.dlq_max_length = config.dlq_max_length
+
+        self.mover_min_sleep_secs = config.mover_min_sleep_ms / 1000
+        self.mover_max_sleep_secs = config.mover_max_sleep_ms / 1000
 
         self.delivery_mode = delivery_mode
         self.consumer_name = consumer_name or f"worker-{uuid.uuid4().hex[:8]}"
@@ -134,7 +137,8 @@ class RedisBroker(Broker):
         await self._client.xadd(stream_key, **kwargs)
 
     async def _move_ready_delayed(self, queue: str) -> int:
-        """Atomically move delayed tasks that are ready to the stream.
+        """
+        Atomically move delayed tasks that are ready to the stream.
 
         Uses a Lua script so that the read-from-sorted-set and write-to-stream
         happen in a single Redis operation.  This prevents multiple workers from
@@ -159,27 +163,30 @@ class RedisBroker(Broker):
         """Return the ETA timestamp of the earliest delayed task, or None."""
         if not self._client:
             return None
+
         items = await self._client.zrange(
-            self._delayed_key(queue), 0, 0, withscores=True,
+            self._delayed_key(queue),
+            0,
+            0,
+            withscores=True,
         )
         if items:
             _member, score = items[0]
             return float(score)
-        return None
 
-    _MOVER_MIN_SLEEP: float = 0.05   # 50 ms — fastest we ever poll
-    _MOVER_MAX_SLEEP: float = 1.0    # 1 s  — idle cadence
+        return None
 
     async def _delayed_mover_loop(self, queue: str) -> None:
         """Background loop: promote ready delayed tasks to the stream.
 
         The loop adapts its polling interval based on the next known ETA:
 
-        * **Tasks just moved** — re-check quickly (50 ms) in case more are
-          ready in a burst.
+        * **Tasks just moved** — re-check quickly (mover_min_sleep_secs) in
+          case more messages are ready in a burst.
         * **Delayed tasks pending** — sleep until the earliest one matures
-          (clamped to [50 ms, 1 s]).
-        * **No delayed tasks** — sleep for 1 s to minimise idle Redis traffic.
+          (clamped to [mover_min_sleep_secs, mover_max_sleep_secs]).
+        * **No delayed tasks** — sleep for mover_max_sleep_secs to minimize
+          idle Redis traffic.
 
         All exceptions except ``CancelledError`` are caught so transient Redis
         errors (pool exhaustion, network blips) cannot kill the loop.
@@ -189,8 +196,8 @@ class RedisBroker(Broker):
                 try:
                     moved = await self._move_ready_delayed(queue)
                     if moved:
-                        # More may be ready right behind; re-check fast.
-                        await asyncio.sleep(self._MOVER_MIN_SLEEP)
+                        # More messages may be ready right behind; re-check fast.
+                        await asyncio.sleep(self.mover_min_sleep_secs)
                         continue
 
                     # Peek at the next delayed task to decide how long to
@@ -198,23 +205,20 @@ class RedisBroker(Broker):
                     score = await self._next_delayed_score(queue)
                     if score is not None:
                         wait = score - datetime.now(UTC).timestamp()
-                        wait = max(self._MOVER_MIN_SLEEP, wait)
-                        wait = min(self._MOVER_MAX_SLEEP, wait)
+                        wait = max(self.mover_min_sleep_secs, wait)
+                        wait = min(self.mover_max_sleep_secs, wait)
                     else:
-                        wait = self._MOVER_MAX_SLEEP
+                        wait = self.mover_max_sleep_secs
 
                     await asyncio.sleep(wait)
 
                 except asyncio.CancelledError:
                     raise
                 except Exception:
-                    _logger.exception(
-                        "delayed-mover iteration failed, will retry"
-                    )
-                    await asyncio.sleep(self._MOVER_MAX_SLEEP)
+                    _logger.exception("delayed-mover iteration failed, will retry")
+                    await asyncio.sleep(self.mover_max_sleep_secs)
         except asyncio.CancelledError:
             pass
-
 
     async def _claim_stale_messages(self, queue: str) -> list[TaskEnvelope]:
         """Claim messages that have been pending too long (dead consumer recovery)."""
