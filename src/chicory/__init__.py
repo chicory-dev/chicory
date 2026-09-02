@@ -17,6 +17,7 @@ from chicory.exceptions import (
     DbPoolExhaustedException,
     MaxRetriesExceededError,
     RetryError,
+    TaskFailedException,
     TaskNotFoundError,
     ValidationError,
 )
@@ -38,36 +39,37 @@ from chicory.types import (
 from chicory.worker import Worker
 
 __all__ = [
-    "Chicory",
-    "Task",
-    "TaskContext",
     "AsyncResult",
-    "TaskState",
-    "TaskMessage",
-    "TaskOptions",
-    "TaskResult",
-    "BrokerType",
-    "BackendType",
-    "ValidationMode",
-    "DeliveryMode",
-    "RetryBackoff",
-    "RetryPolicy",
-    "WorkerStats",
-    "ChicoryError",
-    "TaskNotFoundError",
-    "ValidationError",
-    "RetryError",
-    "MaxRetriesExceededError",
     "BackendNotConfiguredError",
+    "BackendType",
     "BrokerConnectionError",
-    "DbPoolExhaustedException",
-    "Worker",
+    "BrokerType",
+    "Chicory",
     "ChicoryConfig",
-    "WorkerConfig",
+    "ChicoryError",
+    "DbPoolExhaustedException",
+    "DeliveryMode",
+    "MaxRetriesExceededError",
+    "PostgresBackendConfig",
+    "RabbitMQBrokerConfig",
     "RedisBackendConfig",
     "RedisBrokerConfig",
-    "RabbitMQBrokerConfig",
-    "PostgresBackendConfig",
+    "RetryBackoff",
+    "RetryError",
+    "RetryPolicy",
+    "Task",
+    "TaskContext",
+    "TaskFailedException",
+    "TaskMessage",
+    "TaskNotFoundError",
+    "TaskOptions",
+    "TaskResult",
+    "TaskState",
+    "ValidationError",
+    "ValidationMode",
+    "Worker",
+    "WorkerConfig",
+    "WorkerStats",
 ]
 
 try:
@@ -83,8 +85,8 @@ try:
 
     __all__.extend(
         [
-            "RedisBroker",
             "RedisBackend",
+            "RedisBroker",
         ]
     )
 except ImportError:

@@ -42,6 +42,7 @@ class TestOptionalImports:
             [str(python_bin), "-c", command],
             capture_output=True,
             text=True,
+            check=False,
         )
 
     def _run_app_in_venv(
@@ -53,6 +54,7 @@ class TestOptionalImports:
             [str(chicory_bin), *args],
             capture_output=True,
             text=True,
+            check=False,
         )
 
     @pytest.mark.slow

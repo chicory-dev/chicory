@@ -449,7 +449,7 @@ class RabbitMQBroker(Broker):
         """Acknowledge successful processing of a message."""
         raw_message = envelope._raw_message
         if not isinstance(raw_message, AbstractIncomingMessage):
-            raise RuntimeError("Invalid raw message for acknowledgment")
+            raise TypeError("Invalid raw message for acknowledgment")
         if not raw_message.processed:
             await raw_message.ack()
 
@@ -459,7 +459,7 @@ class RabbitMQBroker(Broker):
         """Negatively acknowledge a message, optionally requeuing it."""
         raw_message = envelope._raw_message
         if not isinstance(raw_message, AbstractIncomingMessage):
-            raise RuntimeError("Invalid raw message for negative acknowledgment")
+            raise TypeError("Invalid raw message for negative acknowledgment")
         if not raw_message.processed:
             await raw_message.nack(requeue=requeue)
 

@@ -5,7 +5,7 @@ import contextlib
 import logging
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import redis.asyncio as redis
 
@@ -15,7 +15,7 @@ from chicory.types import BrokerStatus, DeliveryMode, TaskMessage
 from .base import DEFAULT_QUEUE, Broker, DLQMessage, TaskEnvelope
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable
+    from collections.abc import AsyncGenerator
 
 _logger = logging.getLogger("chicory.broker.redis")
 
@@ -72,7 +72,7 @@ class RedisBroker(Broker):
             connection_pool=self._pool,
             decode_responses=False,  # Keep as bytes for consistency
         )
-        await cast("Awaitable[bool]", self._client.ping())
+        await self._client.ping()
 
     async def disconnect(self) -> None:
         self.stop()
@@ -154,7 +154,7 @@ class RedisBroker(Broker):
         delayed_key = self._delayed_key(queue)
         stream_key = self._stream_key(queue)
 
-        moved: int = await self._client.eval(  # ty: ignore[invalid-await]
+        moved: int = await self._client.eval(
             _LUA_MOVE_DELAYED, 2, delayed_key, stream_key, now
         )
         return moved
@@ -298,9 +298,9 @@ class RedisBroker(Broker):
 
                     if result:
                         for stream_name, messages in result:
-                            for msg_id, fields in messages:
-                                if fields and b"data" in fields:
-                                    data = fields[b"data"]
+                            for msg_id, fields in messages:  # ty: ignore
+                                if fields and b"data" in fields:  # ty: ignore
+                                    data = fields[b"data"]  # ty: ignore
                                     message = TaskMessage.loads(data)
 
                                     delivery_tag = (
@@ -413,8 +413,11 @@ class RedisBroker(Broker):
             return []
 
         result = []
-        for msg_id, fields in messages:
+        for msg_id, fields in messages:  # ty: ignore
             stream_id = msg_id.decode() if isinstance(msg_id, bytes) else msg_id
+
+            if fields is None:
+                continue
 
             # Parse message data
             data = fields.get(b"data", b"{}")
@@ -422,6 +425,7 @@ class RedisBroker(Broker):
             try:
                 original_message = TaskMessage.loads(data)
             except Exception:
+                _logger.warning("skipping malformed message: %s", data)
                 continue  # Skip malformed messages
 
             error = fields.get(b"error", b"")
@@ -443,7 +447,7 @@ class RedisBroker(Broker):
                     failed_at=failed_at,
                     error=error if error else None,
                     retry_count=retry_count,
-                    message_id=stream_id,
+                    message_id=stream_id,  # ty: ignore
                 )
             )
 
@@ -473,6 +477,9 @@ class RedisBroker(Broker):
             return False
 
         _, fields = messages[0]
+        if not fields:
+            return False
+
         data = fields.get(b"data", b"{}")
 
         try:
@@ -651,7 +658,7 @@ class RedisBroker(Broker):
             return BrokerStatus(connected=False, error="Not connected")
 
         try:
-            await cast("Awaitable[bool]", self._client.ping())
+            await self._client.ping()
             return BrokerStatus(connected=True)
         except Exception as e:
             return BrokerStatus(connected=False, error=str(e))

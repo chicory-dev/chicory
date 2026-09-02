@@ -145,7 +145,7 @@ exclude = [
 ]
 line-length = 88
 indent-width = 4
-target-version = "py314"
+target-version = "py311"
 
 [tool.ruff.lint]
 extend-select = [
@@ -170,6 +170,7 @@ extend-select = [
 ignore = [
     "F841", # remove unused variables
     "UP040", # new type alias syntax not supported by mypy yet
+    "BLE001", # Do not catch blind exception: `Exception`
 ]
 per-file-ignores = { "__init__.py" = ["F401"] }
 

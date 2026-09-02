@@ -4,19 +4,13 @@ from __future__ import annotations
 class ChicoryError(Exception):
     """Base exception for Chicory."""
 
-    pass
-
 
 class TaskNotFoundError(ChicoryError):
     """Raised when a task is not registered."""
 
-    pass
-
 
 class ValidationError(ChicoryError):
     """Raised when input/output validation fails."""
-
-    pass
 
 
 class RetryError(ChicoryError):
@@ -40,19 +34,13 @@ class RetryError(ChicoryError):
 class MaxRetriesExceededError(ChicoryError):
     """Raised when max retries are exhausted."""
 
-    pass
-
 
 class BackendNotConfiguredError(ChicoryError):
     """Raised when backend operations are attempted without a backend."""
 
-    pass
-
 
 class BrokerConnectionError(ChicoryError):
     """Raised when broker connection fails."""
-
-    pass
 
 
 class DbPoolExhaustedException(ChicoryError):
@@ -61,3 +49,7 @@ class DbPoolExhaustedException(ChicoryError):
     def __init__(self, message: str):
         self.message = message
         super().__init__(message)
+
+
+class TaskFailedException(ChicoryError):
+    """Raised when a task fails."""
