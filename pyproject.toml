@@ -93,7 +93,7 @@ Issues = "https://github.com/chicory-dev/chicory/issues"
 chicory = "chicory.cli:app"
 
 [build-system]
-requires = ["uv_build>=0.9.13,<0.10.0"]
+requires = ["uv_build>=0.9.13,<1.0.0"]
 build-backend = "uv_build"
 
 [tool.pytest.ini_options]
@@ -184,7 +184,7 @@ docstring-code-line-length = "dynamic"
 source = ["src"]
 concurrency = ["thread"]
 omit = [
-    "*/tests/*", 
+    "*/tests/*",
     "*/examples/*",
     "src/chicory/logging.py",
 ]
