@@ -4,14 +4,14 @@ import asyncio
 import time
 from typing import TYPE_CHECKING, Generic, cast
 
-from chicory.exceptions import BackendNotConfiguredError
-from chicory.types import T, TaskState
+from .exceptions import BackendNotConfiguredError, TaskFailedException
+from .types import T, TaskState
 
 if TYPE_CHECKING:
     from chicory.backend.base import Backend
 
 
-class AsyncResult(Generic[T]):  # noqa: UP046
+class AsyncResult(Generic[T]):
     """Asynchronous result handler for task results."""
 
     def __init__(self, task_id: str, backend: Backend | None = None) -> None:
@@ -57,7 +57,7 @@ class AsyncResult(Generic[T]):  # noqa: UP046
                     case TaskState.SUCCESS:
                         return cast("T", result.result)
                     case TaskState.FAILURE:
-                        raise Exception(result.error or "Task failed")
+                        raise TaskFailedException(result.error or "Task failed")
                     case _:
                         pass
 

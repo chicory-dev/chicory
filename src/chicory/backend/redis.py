@@ -22,7 +22,7 @@ class RedisBackend(Backend):
     async def connect(self) -> None:
         self._pool = redis.ConnectionPool.from_url(self.dsn)
         self._client = redis.Redis(connection_pool=self._pool)
-        await self._client.ping()  # ty:ignore[invalid-await]
+        await self._client.ping()
 
     async def disconnect(self) -> None:
         if self._client:
@@ -53,10 +53,10 @@ class RedisBackend(Backend):
         if not self._client:
             raise RuntimeError("Backend not connected")
 
-        await self._client.setex(
+        await self._client.set(
             self._state_key(task_id),
-            self.result_ttl,
             state.value,
+            ex=self.result_ttl,
         )
 
     async def store_result(self, task_id: str, result: TaskResult[Any]) -> None:
@@ -64,15 +64,15 @@ class RedisBackend(Backend):
             raise RuntimeError("Backend not connected")
 
         pipe = self._client.pipeline()
-        pipe.setex(
+        pipe.set(
             self._state_key(task_id),
-            self.result_ttl,
             result.state.value,
+            ex=self.result_ttl,
         )
-        pipe.setex(
+        pipe.set(
             self._result_key(task_id),
-            self.result_ttl,
             result.model_dump_json(),
+            ex=self.result_ttl,
         )
         await pipe.execute()
 
@@ -104,10 +104,10 @@ class RedisBackend(Backend):
 
         pipe = self._client.pipeline()
 
-        pipe.setex(
+        pipe.set(
             self._heartbeat_key(worker_id),
-            ttl,
             heartbeat.model_dump_json(),
+            ex=ttl,
         )
 
         # Add to workers set (for discovery)
@@ -130,7 +130,7 @@ class RedisBackend(Backend):
         if not self._client:
             raise RuntimeError("Backend not connected")
 
-        worker_ids: set[bytes] = await self._client.smembers(self._workers_set_key())  # ty:ignore[invalid-await]
+        worker_ids: set[bytes] = await self._client.smembers(self._workers_set_key())  # ty:ignore[invalid-assignment]
 
         # Use pipeline to batch all heartbeat lookups (avoid N+1 queries)
         decoded_ids = [
@@ -157,7 +157,7 @@ class RedisBackend(Backend):
         if not self._client:
             return 0
 
-        worker_ids: set[bytes] = await self._client.smembers(self._workers_set_key())  # ty:ignore[invalid-await]
+        worker_ids: set[bytes] = await self._client.smembers(self._workers_set_key())  # ty:ignore
         removed = 0
 
         for worker_id_bytes in worker_ids:
@@ -170,7 +170,7 @@ class RedisBackend(Backend):
             # Check if heartbeat key still exists
             exists = await self._client.exists(self._heartbeat_key(worker_id))
             if not exists:
-                await self._client.srem(self._workers_set_key(), worker_id)  # ty:ignore[invalid-await]
+                await self._client.srem(self._workers_set_key(), worker_id)
                 removed += 1
 
         return removed
@@ -181,7 +181,7 @@ class RedisBackend(Backend):
             return BackendStatus(connected=False, error="Not connected")
 
         try:
-            await self._client.ping()  # ty:ignore[invalid-await]
+            await self._client.ping()
             return BackendStatus(connected=True)
         except Exception as e:
             return BackendStatus(connected=False, error=str(e))

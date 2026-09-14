@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import BaseModel
@@ -16,7 +16,7 @@ class TestTaskMessageSerDes:
         timestamp: datetime
 
     def test_serdes_pydantic(self) -> None:
-        model = self.MyPydanticModel(foo="test", number=42, timestamp=datetime.now())
+        model = self.MyPydanticModel(foo="test", number=42, timestamp=datetime.now(UTC))
         message = TaskMessage(
             id="id",
             name="test",
@@ -29,7 +29,7 @@ class TestTaskMessageSerDes:
         assert model.model_dump() == validated_message.args[0].model_dump()
 
     def test_serdes_dict(self) -> None:
-        model = {"foo": "test", "number": 42, "timestamp": datetime.now()}
+        model = {"foo": "test", "number": 42, "timestamp": datetime.now(UTC)}
         message = TaskMessage(
             id="id",
             name="test",
@@ -48,7 +48,9 @@ class TestTaskMessageSerDes:
         timestamp: datetime
 
     def test_serdes_dataclass(self) -> None:
-        model = self.MyDataclassModel(foo="test", number=42, timestamp=datetime.now())
+        model = self.MyDataclassModel(
+            foo="test", number=42, timestamp=datetime.now(UTC)
+        )
         message = TaskMessage(
             id="id",
             name="test",

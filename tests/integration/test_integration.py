@@ -386,7 +386,7 @@ async def test_context_advanced(chicory_worker: Worker, clean_queue: None) -> No
     async def manual_fail(ctx: TaskContext):
         ctx.fail(RuntimeError("Forced failure"))
 
-    result2 = await manual_fail.delay()  # ty: ignore[missing-argument]
+    result2 = await manual_fail.delay()
     with pytest.raises(Exception, match="Forced failure"):
         await result2.get(timeout=10)
 

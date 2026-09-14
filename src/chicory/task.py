@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from chicory.app import Chicory
 
 
-class Task(Generic[P, R]):  # noqa: UP046
+class Task(Generic[P, R]):
     """Wrapper around a task function providing invocation APIs."""
 
     def __init__(self, fn: Callable[P, R], app: Chicory, options: TaskOptions) -> None:

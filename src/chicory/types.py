@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pickle
 import random
-from datetime import UTC, datetime  # noqa: TC003
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Generic, ParamSpec, TypeVar
 
@@ -158,8 +158,11 @@ class TaskMessage(BaseModel):
         return pickle.dumps(message)
 
     @staticmethod
-    def loads(data: bytes, validate: bool = True) -> TaskMessage:
-        message = pickle.loads(data)  # type: ignore[arg-type]
+    def loads(data: bytes | str, validate: bool = True) -> TaskMessage:
+        if isinstance(data, str):
+            data = data.encode("utf-8")
+
+        message = pickle.loads(data)
         if validate:
             # Note: there seems to be no way to re-validate a pydantic model
             # without having to recreate it. This because pydantic assumes a model
@@ -169,7 +172,7 @@ class TaskMessage(BaseModel):
         return message
 
 
-class TaskResult(BaseModel, Generic[T]):  # noqa: UP046
+class TaskResult(BaseModel, Generic[T]):
     """Result payload stored in backend"""
 
     task_id: str = Field(..., description="Unique task identifier")
@@ -221,13 +224,9 @@ class BaseStatus(BaseModel):
 class BrokerStatus(BaseStatus):
     """Health-check result for a broker connection."""
 
-    ...
-
 
 class BackendStatus(BaseStatus):
     """Health-check result for a backend connection."""
-
-    ...
 
 
 class WorkerStats(BaseModel):

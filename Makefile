@@ -5,7 +5,7 @@ down:
 	docker compose down -v
 
 init:
-	uv sync --dev --all-extras 
+	uv sync --dev --all-extras
 
 ty:
 	uv run ty check src/chicory tests
@@ -13,7 +13,10 @@ ty:
 ruff:
 	uv run ruff check src/chicory tests --fix
 
-lint: ruff ty
+format:
+	uv run ruff format src/chicory tests
+
+lint: ruff format ty
 
 test: lint
 	uv run pytest -vv
@@ -26,6 +29,6 @@ test-slow: lint
 
 test-unit: lint
 	uv run pytest -vv -n auto -m "not integration"
-	
+
 test-integration: lint
 	uv run pytest -vv -m "integration"

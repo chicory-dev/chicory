@@ -592,7 +592,7 @@ class TestWorkerConsumeLoop:
         worker = Worker(app)
         worker._running = True
 
-        worker._process_envelope = AsyncMock()  # type: ignore
+        worker._process_envelope = AsyncMock()
 
         await worker._consume_loop()
 
@@ -600,7 +600,7 @@ class TestWorkerConsumeLoop:
         if worker._tasks:
             await asyncio.gather(*worker._tasks)
 
-        assert worker._process_envelope.await_count == 2  # ty:ignore[unresolved-attribute]
+        assert worker._process_envelope.await_count == 2
 
     async def test_consume_loop_tracks_tasks(
         self,
@@ -619,7 +619,7 @@ class TestWorkerConsumeLoop:
         worker = Worker(app)
         worker._running = True
 
-        worker._process_envelope = AsyncMock()  # type: ignore
+        worker._process_envelope = AsyncMock()
 
         await worker._consume_loop()
 
@@ -656,7 +656,7 @@ class TestWorkerConsumeLoop:
         async def process_and_stop(_: Any) -> None:
             worker._running = False
 
-        worker._process_envelope = AsyncMock(side_effect=process_and_stop)  # type: ignore
+        worker._process_envelope = AsyncMock(side_effect=process_and_stop)
 
         await worker._consume_loop()
 
@@ -664,7 +664,7 @@ class TestWorkerConsumeLoop:
         if worker._tasks:
             await asyncio.gather(*worker._tasks)
 
-        assert worker._process_envelope.await_count == 1  # ty:ignore[unresolved-attribute]
+        assert worker._process_envelope.await_count == 1
 
 
 @pytest.mark.asyncio
@@ -675,8 +675,8 @@ class TestWorkerStartStop:
     ) -> None:
         worker = Worker(app)
 
-        worker._consume_loop = AsyncMock()  # type: ignore
-        worker._shutdown = AsyncMock()  # type: ignore
+        worker._consume_loop = AsyncMock()
+        worker._shutdown = AsyncMock()
 
         await worker.start()
 
@@ -714,7 +714,7 @@ class TestWorkerStartStop:
         app: MagicMock,
     ) -> None:
         worker = Worker(app)
-        worker._consume_loop = AsyncMock()  # type: ignore
+        worker._consume_loop = AsyncMock()
 
         await worker.start()
         assert worker._running is True
