@@ -19,6 +19,10 @@ if TYPE_CHECKING:
 
 _logger = logging.getLogger("chicory.broker.redis")
 
+# Extra seconds granted to the socket read timeout on top of ``block_ms``,
+# so a blocking read returns from Redis before the socket gives up.
+_SOCKET_TIMEOUT_MARGIN_SECS = 5.0
+
 # Lua script: atomically move delayed tasks whose score <= now from the
 # sorted set (KEYS[1]) to the stream (KEYS[2]). Returns the number of
 # tasks moved. Because the ZRANGEBYSCORE + ZREM happens inside a single
@@ -67,12 +71,26 @@ class RedisBroker(Broker):
         self._running = False
 
     async def connect(self) -> None:
-        self._pool = redis.ConnectionPool.from_url(self.dsn)
+        self._pool = redis.ConnectionPool.from_url(
+            self.dsn,
+            socket_timeout=self._socket_timeout_secs(),
+        )
         self._client = redis.Redis(
             connection_pool=self._pool,
             decode_responses=False,  # Keep as bytes for consistency
         )
         await self._client.ping()
+
+    def _socket_timeout_secs(self) -> float | None:
+        """Socket read timeout that outlives a blocking ``XREADGROUP``.
+
+        redis-py applies its own socket timeout to every read, so a timeout
+        shorter than ``block_ms`` aborts the poll before the server replies.
+        ``block_ms == 0`` means block forever, which needs no read timeout.
+        """
+        if self.block_ms == 0:
+            return None
+        return self.block_ms / 1000 + _SOCKET_TIMEOUT_MARGIN_SECS
 
     async def disconnect(self) -> None:
         self.stop()

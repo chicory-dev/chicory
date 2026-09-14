@@ -17,6 +17,15 @@ class TestOptionalImports:
         """Get the project root directory."""
         return Path(__file__).parent.parent.parent
 
+    def _create_venv(self, venv_dir: Path) -> None:
+        """Create a virtual environment with pip available.
+
+        ``symlinks`` mirrors what ``python -m venv`` does per platform. On
+        POSIX a *copied* interpreter loses its RPATH to ``libpython``, so the
+        standalone CPython builds that uv installs cannot start.
+        """
+        venv.create(venv_dir, with_pip=True, symlinks=sys.platform != "win32")
+
     def _get_venv_python(self, venv_dir: Path) -> Path:
         """Get the Python executable path in a virtual environment."""
         if sys.platform == "win32":
@@ -81,7 +90,7 @@ class TestOptionalImports:
             venv_dir = Path(tmpdir) / "venv"
 
             # Create virtual environment
-            venv.create(venv_dir, with_pip=True)
+            self._create_venv(venv_dir)
 
             # Install chicory without extras
             pip_bin = self._get_venv_pip(venv_dir)
@@ -195,7 +204,7 @@ class TestOptionalImports:
             venv_dir = Path(tmpdir) / "venv"
 
             # Create virtual environment
-            venv.create(venv_dir, with_pip=True)
+            self._create_venv(venv_dir)
 
             # Install chicory with extra dependency
             pip_bin = self._get_venv_pip(venv_dir)
@@ -235,7 +244,7 @@ class TestOptionalImports:
             venv_dir = Path(tmpdir) / "venv"
 
             # Create virtual environment
-            venv.create(venv_dir, with_pip=True)
+            self._create_venv(venv_dir)
 
             # Install chicory with cli extra
             pip_bin = self._get_venv_pip(venv_dir)

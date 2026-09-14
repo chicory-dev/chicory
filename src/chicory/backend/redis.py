@@ -53,10 +53,10 @@ class RedisBackend(Backend):
         if not self._client:
             raise RuntimeError("Backend not connected")
 
-        await self._client.setex(
+        await self._client.set(
             self._state_key(task_id),
-            self.result_ttl,
             state.value,
+            ex=self.result_ttl,
         )
 
     async def store_result(self, task_id: str, result: TaskResult[Any]) -> None:
@@ -64,15 +64,15 @@ class RedisBackend(Backend):
             raise RuntimeError("Backend not connected")
 
         pipe = self._client.pipeline()
-        pipe.setex(
+        pipe.set(
             self._state_key(task_id),
-            self.result_ttl,
             result.state.value,
+            ex=self.result_ttl,
         )
-        pipe.setex(
+        pipe.set(
             self._result_key(task_id),
-            self.result_ttl,
             result.model_dump_json(),
+            ex=self.result_ttl,
         )
         await pipe.execute()
 
@@ -104,10 +104,10 @@ class RedisBackend(Backend):
 
         pipe = self._client.pipeline()
 
-        pipe.setex(
+        pipe.set(
             self._heartbeat_key(worker_id),
-            ttl,
             heartbeat.model_dump_json(),
+            ex=ttl,
         )
 
         # Add to workers set (for discovery)
